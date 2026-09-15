@@ -96,7 +96,7 @@
             border-radius: 20px;
             border: 1px solid var(--line);
             background: var(--field);
-            color: var(--muted);
+            color: var(--text);
             font-size: 12px;
             font-family: inherit;
             cursor: pointer;
@@ -112,7 +112,8 @@
                 color: var(--accent);
             }
 
-            .like-btn .like-icon { font-size: 13px; }
+            .like-btn .like-icon { display: inline-flex; }
+            .like-btn .like-icon svg { width: 14px; height: 14px; display: block; }
 
         .other-type-note {
             font-size: 12px;
@@ -245,6 +246,10 @@
             .replace(/"/g, '&quot;');
     }
 
+    var HEART_PATH = 'M12 20s-7-4.4-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9z';
+    var HEART_OUTLINE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + HEART_PATH + '"/></svg>';
+    var HEART_FILLED = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="' + HEART_PATH + '"/></svg>';
+
     var params = new URLSearchParams(window.location.search);
     var fp = params.get('fp') || '';
     var machineType = params.get('type') || '';
@@ -299,7 +304,7 @@
             '<div class="case-line"><span class="case-label">Cause:</span> ' + escapeHtml(c.cause) + '</div>' +
             '<div class="case-line"><span class="case-label">Remedy:</span> ' + escapeHtml(c.remedy) + '</div>' +
             '<button type="button" class="like-btn' + (likedByMe ? ' liked' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
-                '<span class="like-icon">' + (likedByMe ? '&#10084;' : '&#9825;') + '</span> ' +
+                '<span class="like-icon">' + (likedByMe ? HEART_FILLED : HEART_OUTLINE) + '</span> ' +
                 '<span class="like-count">' + likedBy.length + '</span>' +
                 '<span class="like-word">' + (likedBy.length === 1 ? ' hat geholfen' : ' fanden das hilfreich') + '</span>' +
             '</button>' +
@@ -363,7 +368,7 @@
                     .then(function(body) {
                         if (!body.success) throw new Error(body.message || 'Fehlgeschlagen');
                         btn.classList.toggle('liked', body.liked);
-                        btn.querySelector('.like-icon').innerHTML = body.liked ? '&#10084;' : '&#9825;';
+                        btn.querySelector('.like-icon').innerHTML = body.liked ? HEART_FILLED : HEART_OUTLINE;
                         btn.querySelector('.like-count').textContent = body.likes;
                         btn.querySelector('.like-word').textContent = body.likes === 1 ? ' hat geholfen' : ' fanden das hilfreich';
                     })

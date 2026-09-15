@@ -266,10 +266,24 @@
             flex-shrink: 0;
             border-radius: 10px;
             background: var(--card);
+            border: 1px solid rgba(231, 106, 29, 0.3);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 17px;
+            color: var(--text);
+        }
+
+            .feature-icon svg { width: 19px; height: 19px; }
+
+            .feature-icon-accent {
+                color: var(--accent);
+                border-color: var(--accent);
+            }
+
+        .scan-btn .icon svg {
+            width: 18px;
+            height: 18px;
+            display: block;
         }
 
         .feature-card h3 {
@@ -385,7 +399,7 @@
             </p>
             <div class="hero-actions">
                 <button type="button" class="primary scan-btn" id="scan-btn">
-                    <span>&#128247;</span> QR-Code scannen
+                    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></svg></span> QR-Code scannen
                 </button>
                 <a class="hero-secondary" href="#how">Wie funktioniert's?</a>
             </div>
@@ -428,21 +442,21 @@
     <section class="features">
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">&#127760;</div>
+                <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 2.6 4.3 5.7 4.3 9s-1.5 6.4-4.3 9c-2.8-2.6-4.3-5.7-4.3-9S9.2 5.6 12 3z"/></svg></div>
                 <div>
                     <h3>Gemeinsame Wissensdatenbank</h3>
                     <p>Jede Lösung steht sofort allen Technikern zur Verfügung &ndash; über Maschinen und Standorte hinweg.</p>
                 </div>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#128245;</div>
+                <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 13a10 10 0 0 1 3.5-2.3"/><path d="M12 20h.01"/><path d="M19 13a10 10 0 0 0-2-1.6"/></svg></div>
                 <div>
                     <h3>Maschine bleibt offline</h3>
                     <p>Nur das Handy braucht eine Verbindung &ndash; die Maschine selbst funktioniert komplett offline.</p>
                 </div>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#10084;&#65039;</div>
+                <div class="feature-icon feature-icon-accent"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 20s-7-4.4-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9z"/></svg></div>
                 <div>
                     <h3>Bewährte Lösungen erkennen</h3>
                     <p>Andere Techniker markieren hilfreiche Einträge &ndash; so sieht man sofort, was wirklich funktioniert.</p>

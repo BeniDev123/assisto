@@ -16,15 +16,23 @@
             .replace(/"/g, '&quot;');
     }
 
+    var ICONS = {
+        home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+        user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
+        chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg>',
+        users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17.3" cy="9" r="2.6"/><path d="M14.6 14.7c2.7.3 5.7 2 5.7 5.3"/></svg>',
+        clipboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 3.5h6v2H9z"/><path d="M9 11h6M9 15h6M9 19h3"/></svg>'
+    };
+
     function buildNavItems(auth) {
-        var items = [{ href: '/', icon: '&#127968;', label: 'Start' }];
+        var items = [{ href: '/', icon: ICONS.home, label: 'Start' }];
         if (auth) {
-            items.push({ href: '/account.html', icon: '&#128100;', label: 'Mein Konto' });
+            items.push({ href: '/account.html', icon: ICONS.user, label: 'Mein Konto' });
         }
         if (auth && auth.role === 'admin') {
-            items.push({ href: '/admin/?section=overview', icon: '&#128202;', label: 'Übersicht' });
-            items.push({ href: '/admin/?section=users', icon: '&#128101;', label: 'Benutzer' });
-            items.push({ href: '/admin/?section=cases', icon: '&#128203;', label: 'Fälle' });
+            items.push({ href: '/admin/?section=overview', icon: ICONS.chart, label: 'Übersicht' });
+            items.push({ href: '/admin/?section=users', icon: ICONS.users, label: 'Benutzer' });
+            items.push({ href: '/admin/?section=cases', icon: ICONS.clipboard, label: 'Fälle' });
         }
         return items;
     }

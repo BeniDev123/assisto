@@ -157,6 +157,11 @@ button.link {
     padding: 20px 12px;
     display: flex;
     flex-direction: column;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -202,8 +207,15 @@ button.link {
 }
 
 .sidebar-nav .nav-icon {
-    font-size: 15px;
-    opacity: 0.85;
+    display: inline-flex;
+    color: var(--text);
+    transition: color 0.15s;
+}
+
+.sidebar-nav .nav-icon svg {
+    width: 17px;
+    height: 17px;
+    display: block;
 }
 
     .sidebar-nav button:hover, .sidebar-nav a.sidebar-link:hover { background: var(--card); color: var(--text); }
@@ -212,6 +224,13 @@ button.link {
         color: var(--text);
         font-weight: 600;
         border-left-color: var(--accent);
+    }
+
+    .sidebar-nav button:hover .nav-icon,
+    .sidebar-nav a.sidebar-link:hover .nav-icon,
+    .sidebar-nav button.active .nav-icon,
+    .sidebar-nav a.sidebar-link.active .nav-icon {
+        color: var(--accent);
     }
 
 .sidebar-identity {

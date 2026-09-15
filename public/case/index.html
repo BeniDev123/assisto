@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assisto – Case Help</title>
+    <style>
+        :root {
+            --bg: #060606;
+            --panel: #1A1A1A;
+            --card: #2B2B2B;
+            --field: #373737;
+            --line: #555555;
+            --text: #FFFFFF;
+            --muted: #CFCFCF;
+            --soft: #9CA3AF;
+            --accent: #E76A1D;
+            --accent-hover: #FF833A;
+            --success: #67C967;
+            --warning: #F5D151;
+            --danger: #F53232;
+            --info: #60A5FA;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        body {
+            padding: 20px 16px 60px 16px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+            header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: 700;
+            }
+
+            header p {
+                margin: 4px 0 0 0;
+                font-size: 13px;
+                color: var(--soft);
+            }
+
+        .context-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 18px;
+        }
+
+        .context-label {
+            font-size: 11px;
+            color: var(--soft);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .context-ids {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .context-id {
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 12px;
+            background: var(--field);
+            color: var(--muted);
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+
+        .context-type {
+            font-size: 12px;
+            color: var(--soft);
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 18px 0 10px 0;
+        }
+
+        .section-heading.good { color: var(--success); }
+        .section-heading.other { color: var(--warning); }
+        .section-heading.partial { color: var(--info); }
+
+        .case-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+
+            .case-card.good { border-color: var(--success); }
+            .case-card.partial { border-color: var(--info); }
+
+        .case-meta {
+            font-size: 11px;
+            color: var(--soft);
+            margin-bottom: 6px;
+        }
+
+        .case-line {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .case-label {
+            color: var(--soft);
+        }
+
+        .other-type-note {
+            font-size: 12px;
+            color: var(--soft);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--soft);
+            font-size: 13px;
+            padding: 20px 10px;
+        }
+
+        .loading {
+            text-align: center;
+            color: var(--soft);
+            font-size: 13px;
+            padding: 30px 10px;
+        }
+
+        form {
+            background: var(--panel);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 22px;
+        }
+
+        form h2 {
+            font-size: 15px;
+            margin: 0 0 12px 0;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--soft);
+            margin-bottom: 4px;
+        }
+
+        textarea, input[type="text"] {
+            width: 100%;
+            background: var(--field);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            padding: 9px 10px;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 12px;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid var(--accent);
+            background: var(--accent);
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+            button:hover {
+                background: var(--accent-hover);
+                border-color: var(--accent-hover);
+            }
+
+            button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+        .form-message {
+            font-size: 13px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+            .form-message.error { color: var(--danger); }
+            .form-message.success { color: var(--success); }
+
+        .offline-note {
+            font-size: 11px;
+            color: var(--soft);
+            text-align: center;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Assisto</h1>
+        <p>Machine fault help</p>
+    </header>
+
+    <div class="context-card">
+        <div class="context-label">This fault combination</div>
+        <div class="context-ids" id="context-ids"></div>
+        <div class="context-type" id="context-type"></div>
+    </div>
+
+    <div id="results">
+        <div class="loading">Looking up known cases…</div>
+    </div>
+
+    <form id="submit-form">
+        <h2>Know the fix? Share it.</h2>
+        <label>Cause</label>
+        <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
+        <label>Remedy</label>
+        <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
+        <label>Technician (optional)</label>
+        <input type="text" id="form-technician" placeholder="Name" />
+        <button type="submit" id="form-submit">Submit</button>
+        <div class="form-message" id="form-message"></div>
+    </form>
+
+    <div class="offline-note">This page needs a connection on your phone &mdash; the machine itself works fully offline.</div>
+
+    <script>
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    var params = new URLSearchParams(window.location.search);
+    var fp = params.get('fp') || '';
+    var machineType = params.get('type') || '';
+    var ids = fp.split('|').filter(Boolean);
+
+    document.getElementById('context-ids').innerHTML = ids.length
+        ? ids.map(function(id) { return '<span class="context-id">' + escapeHtml(id) + '</span>'; }).join('')
+        : '<span class="context-id">no Id in link</span>';
+    document.getElementById('context-type').textContent = machineType ? 'Machine type: ' + machineType : 'Machine type: unknown';
+
+    function buildCaseCardHtml(c, cls) {
+        return '<div class="case-card ' + cls + '">' +
+            '<div class="case-meta">' + escapeHtml(new Date(c.timestamp).toLocaleString()) +
+                (c.technician ? ' &middot; ' + escapeHtml(c.technician) : '') +
+                (c.machineType ? ' &middot; ' + escapeHtml(c.machineType) : '') +
+            '</div>' +
+            '<div class="case-line"><span class="case-label">Cause:</span> ' + escapeHtml(c.cause) + '</div>' +
+            '<div class="case-line"><span class="case-label">Remedy:</span> ' + escapeHtml(c.remedy) + '</div>' +
+        '</div>';
+    }
+
+    function renderResults(data) {
+        var el = document.getElementById('results');
+        var html = '';
+
+        var total = data.exactSameType.length + data.exactOtherType.length +
+            data.partialSameType.length + data.partialOtherType.length;
+
+        if (total === 0) {
+            html = '<div class="empty-state">No known cases for this combination yet &mdash; be the first to share one below.</div>';
+        } else {
+            if (data.exactSameType.length > 0) {
+                html += '<div class="section-heading good">&#10003; Known on this machine type</div>';
+                html += data.exactSameType.map(function(c) { return buildCaseCardHtml(c, 'good'); }).join('');
+            }
+            if (data.exactOtherType.length > 0) {
+                html += '<div class="section-heading other">&#9432; Seen on other machine types &ndash; cause may not apply here</div>';
+                html += data.exactOtherType.map(function(c) { return buildCaseCardHtml(c, ''); }).join('');
+            }
+            if (data.partialSameType.length > 0) {
+                html += '<div class="section-heading partial">&#9680; Partial match &ndash; covers part of this combination</div>';
+                html += data.partialSameType.map(function(c) { return buildCaseCardHtml(c, 'partial'); }).join('');
+            }
+            if (data.partialOtherType.length > 0) {
+                html += '<div class="other-type-note">' + data.partialOtherType.length + ' partial match(es) on other machine types.</div>';
+            }
+        }
+
+        el.innerHTML = html;
+    }
+
+    fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType))
+        .then(function(resp) {
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            return resp.json();
+        })
+        .then(renderResults)
+        .catch(function(err) {
+            document.getElementById('results').innerHTML =
+                '<div class="empty-state">Could not load known cases: ' + escapeHtml(err.message) + '</div>';
+        });
+
+    document.getElementById('submit-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        var cause = document.getElementById('form-cause').value.trim();
+        var remedy = document.getElementById('form-remedy').value.trim();
+        var technician = document.getElementById('form-technician').value.trim();
+        var messageEl = document.getElementById('form-message');
+        var submitBtn = document.getElementById('form-submit');
+
+        if (!cause || !remedy) {
+            messageEl.textContent = 'Please fill in cause and remedy.';
+            messageEl.className = 'form-message error';
+            return;
+        }
+
+        submitBtn.disabled = true;
+        messageEl.textContent = '';
+        messageEl.className = 'form-message';
+
+        fetch('/api/case', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fingerprint: fp,
+                machineType: machineType,
+                cause: cause,
+                remedy: remedy,
+                technician: technician
+            })
+        })
+            .then(function(resp) {
+                if (!resp.ok) return resp.json().then(function(body) { throw new Error(body.message || ('HTTP ' + resp.status)); });
+                return resp.json();
+            })
+            .then(function() {
+                messageEl.textContent = 'Thanks — shared with everyone who scans this fault.';
+                messageEl.className = 'form-message success';
+                document.getElementById('form-cause').value = '';
+                document.getElementById('form-remedy').value = '';
+                document.getElementById('form-technician').value = '';
+                return fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType));
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(renderResults)
+            .catch(function(err) {
+                messageEl.textContent = 'Save failed: ' + err.message;
+                messageEl.className = 'form-message error';
+            })
+            .then(function() {
+                submitBtn.disabled = false;
+            });
+    });
+    </script>
+</body>
+</html>

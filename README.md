@@ -13,10 +13,45 @@ machine's local `KnownCases.json` staying static.
 ## Stack
 
 - Static pages in `public/`
-- One Netlify Function (`netlify/functions/case.mjs`) at `/api/case`,
-  GET to look up cases, POST to add one
+- Netlify Functions at `/api/case` (GET to look up cases, POST to add one,
+  PUT/DELETE for admins to edit/remove one), `/api/auth` (login) and
+  `/api/users` (admin user management)
 - [Netlify Blobs](https://docs.netlify.com/blobs/overview/) as the data
   store — no separate database needed
+
+## User accounts
+
+Looking up known cases (scanning the QR code) stays open to anyone — no
+login needed. Submitting a new cause/remedy requires being logged in, so
+every submission is attributed to a real technician account instead of
+free text anyone could type.
+
+- **Login**: `/login.html` — technicians sign in with a username/password
+  an admin created for them. The session is a signed token stored in
+  the browser (`localStorage`), valid 180 days, sent to `/api/case` as
+  `Authorization: Bearer <token>` when submitting.
+- **Admin page**: `/admin/` — create/delete technician and admin accounts,
+  and edit or delete any submitted case (moderation). Reachable either by
+  logging in with an account that has the `admin` role, or — before any
+  admin account exists — with the `ASSISTO_ADMIN_SECRET` master key below.
+- **Roles**: `technician` (can submit cases) and `admin` (can also manage
+  users and moderate cases).
+
+### Required environment variables
+
+Copy `.env.example` to `.env` for local dev, and set the same two
+variables in the Netlify dashboard (Site configuration → Environment
+variables) for the deployed site:
+
+- `ASSISTO_AUTH_SECRET` — signs login session tokens
+- `ASSISTO_ADMIN_SECRET` — master key for `/admin/` bootstrap access
+
+### Creating the first admin
+
+1. Set `ASSISTO_ADMIN_SECRET` in the environment (see above).
+2. Open `/admin/`, enter that value under "Master-Schlüssel".
+3. Create your first `admin` user there — from then on you can log in
+   normally via `/login.html` instead of using the master key.
 
 ## Local development
 
@@ -25,8 +60,8 @@ npm install
 npx netlify dev
 ```
 
-Opens the site locally (including the function and Blobs) at the URL
-`netlify dev` prints.
+Opens the site locally (including the functions and Blobs) at the URL
+`netlify dev` prints. Make sure `.env` is set up first (see above).
 
 ## Deploy
 

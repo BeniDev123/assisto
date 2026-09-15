@@ -26,6 +26,10 @@
             box-sizing: border-box;
         }
 
+        [hidden] {
+            display: none !important;
+        }
+
         html, body {
             margin: 0;
             padding: 0;
@@ -229,6 +233,62 @@
             text-align: center;
             margin-top: 24px;
         }
+
+        .auth-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-top: 22px;
+            font-size: 12px;
+            color: var(--soft);
+        }
+
+        .auth-bar a, .auth-bar button.link {
+            color: var(--accent);
+            text-decoration: none;
+            background: none;
+            border: none;
+            padding: 0;
+            width: auto;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .login-prompt {
+            text-align: center;
+            background: var(--panel);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            padding: 18px 16px;
+            margin-top: 22px;
+        }
+
+            .login-prompt p {
+                font-size: 13px;
+                color: var(--muted);
+                margin: 0 0 12px 0;
+            }
+
+            .login-prompt a.button {
+                display: inline-block;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                background: var(--accent);
+                color: #fff;
+                text-decoration: none;
+            }
+
+                .login-prompt a.button:hover {
+                    background: var(--accent-hover);
+                }
     </style>
 </head>
 <body>
@@ -248,17 +308,25 @@
         <div class="loading">Looking up known cases…</div>
     </div>
 
-    <form id="submit-form">
+    <form id="submit-form" hidden>
         <h2>Know the fix? Share it.</h2>
         <label>Cause</label>
         <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
         <label>Remedy</label>
         <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
-        <label>Technician (optional)</label>
-        <input type="text" id="form-technician" placeholder="Name" />
         <button type="submit" id="form-submit">Submit</button>
         <div class="form-message" id="form-message"></div>
     </form>
+
+    <div class="auth-bar" id="auth-bar" hidden>
+        <span id="auth-status"></span>
+        <button type="button" class="link" id="logout-btn">Abmelden</button>
+    </div>
+
+    <div class="login-prompt" id="login-prompt" hidden>
+        <p>Kennst du die Lösung? Melde dich an, um sie zu teilen.</p>
+        <a class="button" id="login-link" href="/login.html">Anmelden</a>
+    </div>
 
     <div class="offline-note">This page needs a connection on your phone &mdash; the machine itself works fully offline.</div>
 
@@ -286,6 +354,51 @@
         }).join('')
         : '<span class="context-id">no Id in link</span>';
     document.getElementById('context-type').textContent = machineType ? 'Machine type: ' + machineType : 'Machine type: unknown';
+
+    function getAuth() {
+        try {
+            var raw = localStorage.getItem('assistoAuth');
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function clearAuth() {
+        localStorage.removeItem('assistoAuth');
+    }
+
+    function currentUrl() {
+        return window.location.pathname + window.location.search;
+    }
+
+    function refreshAuthUi() {
+        var auth = getAuth();
+        var form = document.getElementById('submit-form');
+        var authBar = document.getElementById('auth-bar');
+        var loginPrompt = document.getElementById('login-prompt');
+
+        if (auth && auth.token) {
+            form.hidden = false;
+            authBar.hidden = false;
+            loginPrompt.hidden = true;
+            document.getElementById('auth-status').textContent =
+                'Angemeldet als ' + auth.username + (auth.role === 'admin' ? ' (Admin)' : '');
+        } else {
+            form.hidden = true;
+            authBar.hidden = true;
+            loginPrompt.hidden = false;
+            document.getElementById('login-link').href = '/login.html?redirect=' + encodeURIComponent(currentUrl());
+        }
+        return auth;
+    }
+
+    document.getElementById('logout-btn').addEventListener('click', function() {
+        clearAuth();
+        refreshAuthUi();
+    });
+
+    refreshAuthUi();
 
     function buildCaseCardHtml(c, cls) {
         var storedMessages = Array.isArray(c.messages) ? c.messages.filter(Boolean) : [];
@@ -348,9 +461,14 @@
 
         var cause = document.getElementById('form-cause').value.trim();
         var remedy = document.getElementById('form-remedy').value.trim();
-        var technician = document.getElementById('form-technician').value.trim();
         var messageEl = document.getElementById('form-message');
         var submitBtn = document.getElementById('form-submit');
+        var auth = getAuth();
+
+        if (!auth || !auth.token) {
+            refreshAuthUi();
+            return;
+        }
 
         if (!cause || !remedy) {
             messageEl.textContent = 'Please fill in cause and remedy.';
@@ -364,17 +482,24 @@
 
         fetch('/api/case', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + auth.token
+            },
             body: JSON.stringify({
                 fingerprint: fp,
                 machineType: machineType,
                 messages: messages,
                 cause: cause,
-                remedy: remedy,
-                technician: technician
+                remedy: remedy
             })
         })
             .then(function(resp) {
+                if (resp.status === 401) {
+                    clearAuth();
+                    refreshAuthUi();
+                    throw new Error('Session abgelaufen — bitte erneut anmelden.');
+                }
                 if (!resp.ok) return resp.json().then(function(body) { throw new Error(body.message || ('HTTP ' + resp.status)); });
                 return resp.json();
             })
@@ -383,7 +508,6 @@
                 messageEl.className = 'form-message success';
                 document.getElementById('form-cause').value = '';
                 document.getElementById('form-remedy').value = '';
-                document.getElementById('form-technician').value = '';
                 return fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType));
             })
             .then(function(resp) { return resp.json(); })

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assisto – Admin</title>
+    <style>
+        :root {
+            --bg: #060606;
+            --panel: #1A1A1A;
+            --card: #2B2B2B;
+            --field: #373737;
+            --line: #555555;
+            --text: #FFFFFF;
+            --muted: #CFCFCF;
+            --soft: #9CA3AF;
+            --accent: #E76A1D;
+            --accent-hover: #FF833A;
+            --success: #67C967;
+            --danger: #F53232;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        body {
+            padding: 20px 16px 60px 16px;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        header h1 { margin: 0; font-size: 22px; }
+        header p { margin: 0; font-size: 13px; color: var(--soft); }
+
+        button.link {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 0;
+        }
+
+        section {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+
+        section h2 {
+            font-size: 15px;
+            margin: 0 0 12px 0;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--soft);
+            margin-bottom: 4px;
+        }
+
+        input[type="text"], input[type="password"], textarea, select {
+            width: 100%;
+            background: var(--field);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            padding: 9px 10px;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 12px;
+            resize: vertical;
+        }
+
+        button.primary {
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid var(--accent);
+            background: var(--accent);
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+            button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+            button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        button.danger {
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid var(--danger);
+            background: transparent;
+            color: var(--danger);
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+            button.danger:hover { background: var(--danger); color: #fff; }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--line);
+            font-size: 13px;
+        }
+
+            .row:last-child { border-bottom: none; }
+
+        .row-main { flex: 1; min-width: 0; }
+        .row-role { font-size: 11px; color: var(--soft); }
+
+        .case-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+
+        .case-meta { font-size: 11px; color: var(--soft); margin-bottom: 6px; }
+        .case-fp { font-size: 11px; color: var(--soft); margin-bottom: 8px; word-break: break-all; }
+
+        .case-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+        .message { font-size: 13px; margin-top: 8px; }
+        .message.error { color: var(--danger); }
+        .message.success { color: var(--success); }
+
+        .empty-state, .loading {
+            text-align: center;
+            color: var(--soft);
+            font-size: 13px;
+            padding: 16px 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Assisto Admin</h1>
+            <p id="whoami"></p>
+        </div>
+        <button type="button" class="link" id="logout-btn" hidden>Abmelden</button>
+    </header>
+
+    <section id="access-section">
+        <h2>Zugang</h2>
+        <p style="font-size:13px; color:var(--muted); margin-top:0;">
+            Mit einem Admin-Account anmelden, oder falls noch keiner existiert,
+            den Master-Schlüssel (<code>ASSISTO_ADMIN_SECRET</code>) verwenden.
+        </p>
+        <a class="primary" style="display:inline-block; text-decoration:none; margin-bottom: 14px;"
+           id="login-link" href="/login.html?redirect=/admin/">Mit Admin-Account anmelden</a>
+        <label>Oder Master-Schlüssel</label>
+        <input type="password" id="master-secret" placeholder="Master-Schlüssel" />
+        <button type="button" class="primary" id="master-btn">Mit Master-Schlüssel fortfahren</button>
+        <div class="message" id="access-message"></div>
+    </section>
+
+    <div id="admin-body" hidden>
+
+        <section id="users-section">
+            <h2>Benutzer</h2>
+            <div id="users-list"><div class="loading">Lade…</div></div>
+
+            <h2 style="margin-top:18px;">Neuen Benutzer anlegen</h2>
+            <form id="create-user-form">
+                <label>Benutzername</label>
+                <input type="text" id="new-username" autocapitalize="off" placeholder="z.B. m.mueller" />
+                <label>Passwort (mind. 8 Zeichen)</label>
+                <input type="password" id="new-password" />
+                <label>Rolle</label>
+                <select id="new-role">
+                    <option value="technician">Techniker</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button type="submit" class="primary" id="create-user-btn">Anlegen</button>
+                <div class="message" id="create-user-message"></div>
+            </form>
+        </section>
+
+        <section id="cases-section">
+            <h2>Gemeldete Fälle</h2>
+            <div id="cases-list"><div class="loading">Lade…</div></div>
+        </section>
+
+    </div>
+
+    <script>
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function getUserAuth() {
+        try {
+            var raw = localStorage.getItem('assistoAuth');
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    }
+
+    function getMasterSecret() {
+        return sessionStorage.getItem('assistoAdminSecret');
+    }
+
+    function adminHeaders(extra) {
+        var headers = Object.assign({}, extra);
+        var master = getMasterSecret();
+        var userAuth = getUserAuth();
+        if (master) {
+            headers['X-Admin-Secret'] = master;
+        } else if (userAuth && userAuth.token) {
+            headers['Authorization'] = 'Bearer ' + userAuth.token;
+        }
+        return headers;
+    }
+
+    function hasAdminAccess() {
+        var userAuth = getUserAuth();
+        return !!getMasterSecret() || (userAuth && userAuth.role === 'admin');
+    }
+
+    function logout() {
+        sessionStorage.removeItem('assistoAdminSecret');
+        var userAuth = getUserAuth();
+        if (userAuth && userAuth.role === 'admin') localStorage.removeItem('assistoAuth');
+        updateAccessUi();
+    }
+
+    function updateAccessUi() {
+        var access = hasAdminAccess();
+        document.getElementById('access-section').hidden = access;
+        document.getElementById('admin-body').hidden = !access;
+        document.getElementById('logout-btn').hidden = !access;
+
+        var userAuth = getUserAuth();
+        var whoami = document.getElementById('whoami');
+        if (getMasterSecret()) {
+            whoami.textContent = 'Zugang über Master-Schlüssel';
+        } else if (userAuth && userAuth.role === 'admin') {
+            whoami.textContent = 'Angemeldet als ' + userAuth.username + ' (Admin)';
+        } else {
+            whoami.textContent = '';
+        }
+
+        if (access) {
+            loadUsers();
+            loadCases();
+        }
+    }
+
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
+    document.getElementById('master-btn').addEventListener('click', function() {
+        var value = document.getElementById('master-secret').value.trim();
+        var msg = document.getElementById('access-message');
+        if (!value) {
+            msg.textContent = 'Bitte Master-Schlüssel eingeben.';
+            msg.className = 'message error';
+            return;
+        }
+        sessionStorage.setItem('assistoAdminSecret', value);
+
+        fetch('/api/users', { headers: adminHeaders() })
+            .then(function(resp) {
+                if (!resp.ok) throw new Error('Ungültiger Master-Schlüssel');
+                msg.textContent = '';
+                updateAccessUi();
+            })
+            .catch(function(err) {
+                sessionStorage.removeItem('assistoAdminSecret');
+                msg.textContent = err.message;
+                msg.className = 'message error';
+            });
+    });
+
+    function loadUsers() {
+        fetch('/api/users', { headers: adminHeaders() })
+            .then(function(resp) {
+                if (resp.status === 401) { logout(); throw new Error('Zugang abgelaufen'); }
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.json();
+            })
+            .then(function(data) { renderUsers(data.users || []); })
+            .catch(function(err) {
+                document.getElementById('users-list').innerHTML =
+                    '<div class="empty-state">Konnte Benutzer nicht laden: ' + escapeHtml(err.message) + '</div>';
+            });
+    }
+
+    function renderUsers(users) {
+        var el = document.getElementById('users-list');
+        if (users.length === 0) {
+            el.innerHTML = '<div class="empty-state">Noch keine Benutzer.</div>';
+            return;
+        }
+        el.innerHTML = users.map(function(u) {
+            return '<div class="row">' +
+                '<div class="row-main">' + escapeHtml(u.username) +
+                    '<div class="row-role">' + (u.role === 'admin' ? 'Admin' : 'Techniker') + '</div>' +
+                '</div>' +
+                '<button type="button" class="danger" data-username="' + escapeHtml(u.username) + '">Löschen</button>' +
+            '</div>';
+        }).join('');
+
+        el.querySelectorAll('button[data-username]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var username = btn.getAttribute('data-username');
+                if (!confirm('Benutzer "' + username + '" wirklich löschen?')) return;
+                fetch('/api/users?username=' + encodeURIComponent(username), {
+                    method: 'DELETE',
+                    headers: adminHeaders()
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
+                        loadUsers();
+                    })
+                    .catch(function(err) { alert(err.message); });
+            });
+        });
+    }
+
+    document.getElementById('create-user-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var username = document.getElementById('new-username').value.trim();
+        var password = document.getElementById('new-password').value;
+        var role = document.getElementById('new-role').value;
+        var msg = document.getElementById('create-user-message');
+        var btn = document.getElementById('create-user-btn');
+
+        btn.disabled = true;
+        msg.textContent = '';
+
+        fetch('/api/users', {
+            method: 'POST',
+            headers: adminHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ username: username, password: password, role: role })
+        })
+            .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+            .then(function(r) {
+                if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Anlegen fehlgeschlagen');
+                msg.textContent = 'Benutzer angelegt.';
+                msg.className = 'message success';
+                document.getElementById('new-username').value = '';
+                document.getElementById('new-password').value = '';
+                loadUsers();
+            })
+            .catch(function(err) {
+                msg.textContent = err.message;
+                msg.className = 'message error';
+            })
+            .then(function() { btn.disabled = false; });
+    });
+
+    function loadCases() {
+        fetch('/api/case?all=1', { headers: adminHeaders() })
+            .then(function(resp) {
+                if (resp.status === 401) { logout(); throw new Error('Zugang abgelaufen'); }
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.json();
+            })
+            .then(function(data) { renderCases(data.cases || []); })
+            .catch(function(err) {
+                document.getElementById('cases-list').innerHTML =
+                    '<div class="empty-state">Konnte Fälle nicht laden: ' + escapeHtml(err.message) + '</div>';
+            });
+    }
+
+    function renderCases(cases) {
+        var el = document.getElementById('cases-list');
+        if (cases.length === 0) {
+            el.innerHTML = '<div class="empty-state">Noch keine gemeldeten Fälle.</div>';
+            return;
+        }
+        el.innerHTML = cases.map(function(c) {
+            return '<div class="case-card" data-id="' + escapeHtml(c.id) + '">' +
+                '<div class="case-meta">' + escapeHtml(new Date(c.timestamp).toLocaleString()) +
+                    ' &middot; ' + escapeHtml(c.technician || '?') +
+                    (c.machineType ? ' &middot; ' + escapeHtml(c.machineType) : '') +
+                '</div>' +
+                '<div class="case-fp">' + escapeHtml(c.fingerprint) + '</div>' +
+                '<label>Cause</label>' +
+                '<textarea rows="2" class="edit-cause">' + escapeHtml(c.cause) + '</textarea>' +
+                '<label>Remedy</label>' +
+                '<textarea rows="2" class="edit-remedy">' + escapeHtml(c.remedy) + '</textarea>' +
+                '<div class="case-actions">' +
+                    '<button type="button" class="primary save-btn">Speichern</button>' +
+                    '<button type="button" class="danger delete-btn">Löschen</button>' +
+                '</div>' +
+                '<div class="message"></div>' +
+            '</div>';
+        }).join('');
+
+        el.querySelectorAll('.case-card').forEach(function(card) {
+            var id = card.getAttribute('data-id');
+            var msgEl = card.querySelector('.message');
+
+            card.querySelector('.save-btn').addEventListener('click', function() {
+                var cause = card.querySelector('.edit-cause').value.trim();
+                var remedy = card.querySelector('.edit-remedy').value.trim();
+                fetch('/api/case', {
+                    method: 'PUT',
+                    headers: adminHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ id: id, cause: cause, remedy: remedy })
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Speichern fehlgeschlagen');
+                        msgEl.textContent = 'Gespeichert.';
+                        msgEl.className = 'message success';
+                    })
+                    .catch(function(err) {
+                        msgEl.textContent = err.message;
+                        msgEl.className = 'message error';
+                    });
+            });
+
+            card.querySelector('.delete-btn').addEventListener('click', function() {
+                if (!confirm('Diesen Fall wirklich löschen?')) return;
+                fetch('/api/case?id=' + encodeURIComponent(id), {
+                    method: 'DELETE',
+                    headers: adminHeaders()
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
+                        card.remove();
+                    })
+                    .catch(function(err) { alert(err.message); });
+            });
+        });
+    }
+
+    updateAccessUi();
+    </script>
+</body>
+</html>

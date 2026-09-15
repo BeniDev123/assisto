@@ -1,4 +1,5 @@
 import { getStore } from '@netlify/blobs';
+import { requireUser, requireAdmin } from './lib/auth.mjs';
 
 // Same matching approach as ControlCenter's local logs.html: a fingerprint
 // is an unordered set of Ids. "Exact" = same set. "Partial" = a previously
@@ -39,6 +40,13 @@ function jsonResponse(body, status = 200) {
   });
 }
 
+async function handleGetAll(req, store) {
+  const admin = await requireAdmin(req);
+  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
+  const cases = await loadCases(store);
+  return jsonResponse({ cases: cases.slice().reverse() });
+}
+
 async function handleGet(store, url) {
   const fp = url.searchParams.get('fp') || '';
   const type = url.searchParams.get('type') || '';
@@ -68,6 +76,9 @@ async function handleGet(store, url) {
 }
 
 async function handlePost(store, req) {
+  const user = await requireUser(req);
+  if (!user) return jsonResponse({ success: false, message: 'Login required to share a fix' }, 401);
+
   let body;
   try {
     body = await req.json();
@@ -79,7 +90,6 @@ async function handlePost(store, req) {
   const cause = (body.cause || '').trim();
   const remedy = (body.remedy || '').trim();
   const machineType = (body.machineType || '').trim();
-  const technician = (body.technician || '').trim();
   const messages = Array.isArray(body.messages) ? body.messages.map((m) => String(m).trim()).filter(Boolean) : [];
 
   if (!fingerprint || !cause || !remedy) {
@@ -92,7 +102,7 @@ async function handlePost(store, req) {
     fingerprint,
     machineType: machineType || '---',
     timestamp: new Date().toISOString(),
-    technician,
+    technician: user.username,
     messages,
     cause,
     remedy,
@@ -104,6 +114,54 @@ async function handlePost(store, req) {
   return jsonResponse({ success: true, entry });
 }
 
+async function handlePut(store, req) {
+  const admin = await requireAdmin(req);
+  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
+
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return jsonResponse({ success: false, message: `Invalid JSON: ${err.message}` }, 400);
+  }
+
+  const id = (body.id || '').trim();
+  const cause = (body.cause || '').trim();
+  const remedy = (body.remedy || '').trim();
+  if (!id || !cause || !remedy) {
+    return jsonResponse({ success: false, message: 'id, cause and remedy are required' }, 400);
+  }
+
+  const cases = await loadCases(store);
+  const entry = cases.find((c) => c.id === id);
+  if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
+
+  entry.cause = cause;
+  entry.remedy = remedy;
+  entry.editedAt = new Date().toISOString();
+  entry.editedBy = admin.username;
+
+  await store.setJSON(BLOB_KEY, cases);
+  return jsonResponse({ success: true, entry });
+}
+
+async function handleDelete(store, req, url) {
+  const admin = await requireAdmin(req);
+  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
+
+  const id = (url.searchParams.get('id') || '').trim();
+  if (!id) return jsonResponse({ success: false, message: 'id query param is required' }, 400);
+
+  const cases = await loadCases(store);
+  const remaining = cases.filter((c) => c.id !== id);
+  if (remaining.length === cases.length) {
+    return jsonResponse({ success: false, message: 'Case not found' }, 404);
+  }
+
+  await store.setJSON(BLOB_KEY, remaining);
+  return jsonResponse({ success: true });
+}
+
 export default async (req) => {
   // Strong consistency: a technician who just submitted a case immediately
   // re-fetches the list to see it reflected - the default "eventual"
@@ -111,8 +169,12 @@ export default async (req) => {
   const store = getStore({ name: STORE_NAME, consistency: 'strong' });
   const url = new URL(req.url);
 
-  if (req.method === 'GET') return handleGet(store, url);
+  if (req.method === 'GET') {
+    return url.searchParams.get('all') === '1' ? handleGetAll(req, store) : handleGet(store, url);
+  }
   if (req.method === 'POST') return handlePost(store, req);
+  if (req.method === 'PUT') return handlePut(store, req);
+  if (req.method === 'DELETE') return handleDelete(store, req, url);
 
   return new Response('Method Not Allowed', { status: 405 });
 };

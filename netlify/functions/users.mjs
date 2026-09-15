@@ -8,6 +8,11 @@ function jsonResponse(body, status = 200) {
   });
 }
 
+function validatePassword(password) {
+  if (!password || password.length < 8) return 'password must be at least 8 characters';
+  return null;
+}
+
 async function handleGet() {
   const users = await loadUsers();
   return jsonResponse({ users: users.map(publicUser) });
@@ -28,9 +33,8 @@ async function handlePost(req, admin) {
   if (!username || !password) {
     return jsonResponse({ success: false, message: 'username and password are required' }, 400);
   }
-  if (password.length < 8) {
-    return jsonResponse({ success: false, message: 'password must be at least 8 characters' }, 400);
-  }
+  const passwordError = validatePassword(password);
+  if (passwordError) return jsonResponse({ success: false, message: passwordError }, 400);
   if (!/^[a-z0-9._-]+$/.test(username)) {
     return jsonResponse({ success: false, message: 'username may only contain lowercase letters, digits, dots, dashes and underscores' }, 400);
   }
@@ -52,6 +56,32 @@ async function handlePost(req, admin) {
   users.push(user);
   await saveUsers(users);
 
+  return jsonResponse({ success: true, user: publicUser(user) });
+}
+
+async function handlePatch(req) {
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return jsonResponse({ success: false, message: `Invalid JSON: ${err.message}` }, 400);
+  }
+
+  const username = (body.username || '').trim().toLowerCase();
+  const password = body.password || '';
+  if (!username) return jsonResponse({ success: false, message: 'username is required' }, 400);
+  const passwordError = validatePassword(password);
+  if (passwordError) return jsonResponse({ success: false, message: passwordError }, 400);
+
+  const users = await loadUsers();
+  const user = users.find((u) => u.username === username);
+  if (!user) return jsonResponse({ success: false, message: 'User not found' }, 404);
+
+  const { salt, hash } = await hashPassword(password);
+  user.salt = salt;
+  user.hash = hash;
+
+  await saveUsers(users);
   return jsonResponse({ success: true, user: publicUser(user) });
 }
 
@@ -79,6 +109,7 @@ export default async (req) => {
 
   if (req.method === 'GET') return handleGet();
   if (req.method === 'POST') return handlePost(req, admin);
+  if (req.method === 'PATCH') return handlePatch(req);
   if (req.method === 'DELETE') return handleDelete(req, admin);
 
   return new Response('Method Not Allowed', { status: 405 });

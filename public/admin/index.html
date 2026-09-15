@@ -22,6 +22,8 @@
 
         * { box-sizing: border-box; }
 
+        [hidden] { display: none !important; }
+
         html, body {
             margin: 0;
             padding: 0;
@@ -130,6 +132,26 @@
         }
 
             .row:last-child { border-bottom: none; }
+
+        .user-card {
+            border-bottom: 1px solid var(--line);
+            padding: 8px 0;
+        }
+
+            .user-card:last-child { border-bottom: none; }
+
+        .pw-panel {
+            margin-top: 8px;
+            padding-top: 8px;
+        }
+
+            .pw-panel label {
+                margin-bottom: 4px;
+            }
+
+            .pw-panel input {
+                margin-bottom: 10px;
+            }
 
         .row-main { flex: 1; min-width: 0; }
         .row-role { font-size: 11px; color: var(--soft); }
@@ -324,17 +346,36 @@
             return;
         }
         el.innerHTML = users.map(function(u) {
-            return '<div class="row">' +
-                '<div class="row-main">' + escapeHtml(u.username) +
-                    '<div class="row-role">' + (u.role === 'admin' ? 'Admin' : 'Techniker') + '</div>' +
+            var username = escapeHtml(u.username);
+            return '<div class="user-card" data-username="' + username + '">' +
+                '<div class="row" style="border-bottom:none; padding-bottom:0;">' +
+                    '<div class="row-main">' + username +
+                        '<div class="row-role">' + (u.role === 'admin' ? 'Admin' : 'Techniker') + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex; gap:8px;">' +
+                        '<button type="button" class="link pw-toggle-btn">Passwort ändern</button>' +
+                        '<button type="button" class="danger delete-user-btn">Löschen</button>' +
+                    '</div>' +
                 '</div>' +
-                '<button type="button" class="danger" data-username="' + escapeHtml(u.username) + '">Löschen</button>' +
+                '<div class="pw-panel" hidden>' +
+                    '<label>Neues Passwort (mind. 8 Zeichen)</label>' +
+                    '<input type="password" class="pw-input" />' +
+                    '<div style="display:flex; gap:8px;">' +
+                        '<button type="button" class="primary pw-save-btn">Speichern</button>' +
+                        '<button type="button" class="link pw-cancel-btn">Abbrechen</button>' +
+                    '</div>' +
+                    '<div class="message pw-message"></div>' +
+                '</div>' +
             '</div>';
         }).join('');
 
-        el.querySelectorAll('button[data-username]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var username = btn.getAttribute('data-username');
+        el.querySelectorAll('.user-card').forEach(function(card) {
+            var username = card.getAttribute('data-username');
+            var pwPanel = card.querySelector('.pw-panel');
+            var pwInput = card.querySelector('.pw-input');
+            var pwMessage = card.querySelector('.pw-message');
+
+            card.querySelector('.delete-user-btn').addEventListener('click', function() {
                 if (!confirm('Benutzer "' + username + '" wirklich löschen?')) return;
                 fetch('/api/users?username=' + encodeURIComponent(username), {
                     method: 'DELETE',
@@ -346,6 +387,38 @@
                         loadUsers();
                     })
                     .catch(function(err) { alert(err.message); });
+            });
+
+            card.querySelector('.pw-toggle-btn').addEventListener('click', function() {
+                pwPanel.hidden = !pwPanel.hidden;
+                if (!pwPanel.hidden) pwInput.focus();
+            });
+
+            card.querySelector('.pw-cancel-btn').addEventListener('click', function() {
+                pwPanel.hidden = true;
+                pwInput.value = '';
+                pwMessage.textContent = '';
+            });
+
+            card.querySelector('.pw-save-btn').addEventListener('click', function() {
+                var password = pwInput.value;
+                pwMessage.textContent = '';
+                fetch('/api/users', {
+                    method: 'PATCH',
+                    headers: adminHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ username: username, password: password })
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Ändern fehlgeschlagen');
+                        pwMessage.textContent = 'Passwort geändert.';
+                        pwMessage.className = 'message success';
+                        pwInput.value = '';
+                    })
+                    .catch(function(err) {
+                        pwMessage.textContent = err.message;
+                        pwMessage.className = 'message error';
+                    });
             });
         });
     }

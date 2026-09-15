@@ -145,6 +145,36 @@ async function handlePut(store, req) {
   return jsonResponse({ success: true, entry });
 }
 
+// Any logged-in user can like/unlike a case ("this helped me") - toggles
+// their username in and out of the case's likedBy list.
+async function handleToggleLike(store, req) {
+  const user = await requireUser(req);
+  if (!user) return jsonResponse({ success: false, message: 'Login required to like a case' }, 401);
+
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return jsonResponse({ success: false, message: `Invalid JSON: ${err.message}` }, 400);
+  }
+
+  const id = (body.id || '').trim();
+  if (!id) return jsonResponse({ success: false, message: 'id is required' }, 400);
+
+  const cases = await loadCases(store);
+  const entry = cases.find((c) => c.id === id);
+  if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
+
+  if (!Array.isArray(entry.likedBy)) entry.likedBy = [];
+  const idx = entry.likedBy.indexOf(user.username);
+  const liked = idx === -1;
+  if (liked) entry.likedBy.push(user.username);
+  else entry.likedBy.splice(idx, 1);
+
+  await store.setJSON(BLOB_KEY, cases);
+  return jsonResponse({ success: true, liked, likes: entry.likedBy.length });
+}
+
 async function handleDelete(store, req, url) {
   const admin = await requireAdmin(req);
   if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
@@ -174,6 +204,7 @@ export default async (req) => {
   }
   if (req.method === 'POST') return handlePost(store, req);
   if (req.method === 'PUT') return handlePut(store, req);
+  if (req.method === 'PATCH') return handleToggleLike(store, req);
   if (req.method === 'DELETE') return handleDelete(store, req, url);
 
   return new Response('Method Not Allowed', { status: 405 });

@@ -61,13 +61,21 @@
         .stat-card {
             background: var(--panel);
             border: 1px solid var(--line);
+            border-top: 3px solid var(--accent);
             border-radius: 10px;
             padding: 16px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            transition: transform 0.15s;
         }
 
+            .stat-card:hover { transform: translateY(-2px); }
+
         .stat-value {
-            font-size: 26px;
+            font-size: 28px;
             font-weight: 700;
+            background: linear-gradient(135deg, var(--text), var(--muted));
+            -webkit-background-clip: text;
+            background-clip: text;
         }
 
         .stat-label {
@@ -82,6 +90,7 @@
             border-radius: 10px;
             padding: 16px;
             margin-bottom: 18px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
         }
 
         .row {
@@ -153,13 +162,16 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-brand">Assisto Admin</div>
             <nav class="sidebar-nav">
-                <button type="button" data-section="overview" class="active">Übersicht</button>
-                <button type="button" data-section="users">Benutzer</button>
-                <button type="button" data-section="cases">Fälle</button>
+                <button type="button" data-section="overview" class="active"><span class="nav-icon">&#128202;</span>Übersicht</button>
+                <button type="button" data-section="users"><span class="nav-icon">&#128101;</span>Benutzer</button>
+                <button type="button" data-section="cases"><span class="nav-icon">&#128203;</span>Fälle</button>
             </nav>
             <div class="sidebar-footer">
                 <div class="whoami" id="whoami"></div>
-                <button type="button" class="link" id="logout-btn">Abmelden</button>
+                <div style="display:flex; gap:12px; margin-top:4px;">
+                    <a class="link" href="/account.html" style="text-decoration:none;">Mein Konto</a>
+                    <button type="button" class="link" id="logout-btn">Abmelden</button>
+                </div>
             </div>
         </div>
 
@@ -177,6 +189,16 @@
                         <div class="stat-label">Gemeldete Fälle</div>
                     </div>
                 </div>
+
+                <section class="panel-card">
+                    <h2>Meldungen pro Techniker</h2>
+                    <div id="stats-by-technician"><div class="loading">Lade…</div></div>
+                </section>
+
+                <section class="panel-card">
+                    <h2>Hilfreichste Fälle</h2>
+                    <div id="stats-top-liked"><div class="loading">Lade…</div></div>
+                </section>
             </section>
 
             <section class="panel" id="panel-users" hidden>
@@ -205,6 +227,12 @@
 
             <section class="panel" id="panel-cases" hidden>
                 <h1>Gemeldete Fälle</h1>
+                <div style="max-width:260px;">
+                    <label>Nach Maschinentyp filtern</label>
+                    <select id="case-type-filter">
+                        <option value="">Alle Maschinentypen</option>
+                    </select>
+                </div>
                 <div id="cases-list"><div class="loading">Lade…</div></div>
             </section>
 
@@ -438,6 +466,8 @@
             .then(function() { btn.disabled = false; });
     });
 
+    var allCases = [];
+
     function loadCases() {
         fetch('/api/case?all=1', { headers: AssistoAuth.adminHeaders() })
             .then(function(resp) {
@@ -446,15 +476,68 @@
                 return resp.json();
             })
             .then(function(data) {
-                var cases = data.cases || [];
-                document.getElementById('stat-cases').textContent = cases.length;
-                renderCases(cases);
+                allCases = data.cases || [];
+                document.getElementById('stat-cases').textContent = allCases.length;
+                renderOverviewStats(allCases);
+                populateTypeFilter(allCases);
+                renderCases(filterCasesByType(allCases, document.getElementById('case-type-filter').value));
             })
             .catch(function(err) {
                 document.getElementById('cases-list').innerHTML =
                     '<div class="empty-state">Konnte Fälle nicht laden: ' + escapeHtml(err.message) + '</div>';
             });
     }
+
+    function renderOverviewStats(cases) {
+        var byTechnician = {};
+        cases.forEach(function(c) {
+            var name = c.technician || 'unbekannt';
+            byTechnician[name] = (byTechnician[name] || 0) + 1;
+        });
+        var technicianRows = Object.keys(byTechnician)
+            .map(function(name) { return { name: name, count: byTechnician[name] }; })
+            .sort(function(a, b) { return b.count - a.count; });
+
+        var byTechnicianEl = document.getElementById('stats-by-technician');
+        byTechnicianEl.innerHTML = technicianRows.length === 0
+            ? '<div class="empty-state">Noch keine Meldungen.</div>'
+            : technicianRows.map(function(r) {
+                return '<div class="row"><div class="row-main">' + escapeHtml(r.name) + '</div>' +
+                    '<div>' + r.count + '</div></div>';
+            }).join('');
+
+        var topLiked = cases.slice()
+            .filter(function(c) { return Array.isArray(c.likedBy) && c.likedBy.length > 0; })
+            .sort(function(a, b) { return b.likedBy.length - a.likedBy.length; })
+            .slice(0, 5);
+
+        var topLikedEl = document.getElementById('stats-top-liked');
+        topLikedEl.innerHTML = topLiked.length === 0
+            ? '<div class="empty-state">Noch keine Likes vergeben.</div>'
+            : topLiked.map(function(c) {
+                return '<div class="row"><div class="row-main">' + escapeHtml(c.cause) +
+                    '<div class="row-role">' + escapeHtml(c.machineType || '---') + '</div></div>' +
+                    '<div>&#10084; ' + c.likedBy.length + '</div></div>';
+            }).join('');
+    }
+
+    function populateTypeFilter(cases) {
+        var select = document.getElementById('case-type-filter');
+        var current = select.value;
+        var types = Array.from(new Set(cases.map(function(c) { return c.machineType || '---'; }))).sort();
+        select.innerHTML = '<option value="">Alle Maschinentypen</option>' +
+            types.map(function(t) { return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>'; }).join('');
+        select.value = types.indexOf(current) !== -1 ? current : '';
+    }
+
+    function filterCasesByType(cases, type) {
+        if (!type) return cases;
+        return cases.filter(function(c) { return (c.machineType || '---') === type; });
+    }
+
+    document.getElementById('case-type-filter').addEventListener('change', function() {
+        renderCases(filterCasesByType(allCases, this.value));
+    });
 
     function renderCases(cases) {
         var el = document.getElementById('cases-list');
@@ -498,6 +581,8 @@
                         if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Speichern fehlgeschlagen');
                         msgEl.textContent = 'Gespeichert.';
                         msgEl.className = 'message success';
+                        var cached = allCases.find(function(c) { return c.id === id; });
+                        if (cached) { cached.cause = cause; cached.remedy = remedy; }
                     })
                     .catch(function(err) {
                         msgEl.textContent = err.message;
@@ -515,8 +600,9 @@
                     .then(function(r) {
                         if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
                         card.remove();
-                        var current = parseInt(document.getElementById('stat-cases').textContent, 10);
-                        if (!isNaN(current)) document.getElementById('stat-cases').textContent = current - 1;
+                        allCases = allCases.filter(function(c) { return c.id !== id; });
+                        document.getElementById('stat-cases').textContent = allCases.length;
+                        renderOverviewStats(allCases);
                     })
                     .catch(function(err) { alert(err.message); });
             });

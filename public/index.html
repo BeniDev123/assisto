@@ -23,9 +23,67 @@
         .hero p {
             color: var(--soft);
             font-size: 14px;
-            margin: 0;
+            margin: 0 0 22px 0;
             max-width: 320px;
         }
+
+        .scan-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+        }
+
+        .scanner-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scanner-video-wrap {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .scanner-video-wrap video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scanner-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(70vw, 260px);
+            height: min(70vw, 260px);
+            border: 3px solid var(--accent);
+            border-radius: 16px;
+            box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.45);
+        }
+
+        .scanner-bar {
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--panel);
+        }
+
+        .scanner-status {
+            font-size: 13px;
+            color: var(--muted);
+            text-align: center;
+            padding: 10px 16px;
+            background: var(--panel);
+        }
+
+            .scanner-status.error { color: var(--danger); }
     </style>
 </head>
 <body>
@@ -39,8 +97,97 @@
         <div>
             <h1>Assisto</h1>
             <p>Scan the QR code on a machine's fault screen to get cause &amp; remedy help for that specific error.</p>
+            <button type="button" class="primary scan-btn" id="scan-btn">
+                <span>&#128247;</span> QR-Code scannen
+            </button>
         </div>
     </div>
+
+    <div class="scanner-overlay" id="scanner-overlay" hidden>
+        <div class="scanner-bar">
+            <span class="topbar-brand">QR-Code scannen</span>
+            <button type="button" class="link" id="scanner-close" style="color:#fff;">Abbrechen</button>
+        </div>
+        <div class="scanner-video-wrap">
+            <video id="scanner-video" playsinline autoplay muted></video>
+            <div class="scanner-frame"></div>
+        </div>
+        <div class="scanner-status" id="scanner-status">Kamera wird gestartet…</div>
+    </div>
+
+    <canvas id="scanner-canvas" hidden></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script>
+    var overlay = document.getElementById('scanner-overlay');
+    var video = document.getElementById('scanner-video');
+    var canvas = document.getElementById('scanner-canvas');
+    var statusEl = document.getElementById('scanner-status');
+    var stream = null;
+    var scanLoopId = null;
+
+    function stopScanner() {
+        if (scanLoopId) cancelAnimationFrame(scanLoopId);
+        scanLoopId = null;
+        if (stream) {
+            stream.getTracks().forEach(function(track) { track.stop(); });
+            stream = null;
+        }
+        overlay.hidden = true;
+    }
+
+    function scanFrame() {
+        var canvasCtx = canvas.getContext('2d');
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            var imageData = canvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            var code = typeof jsQR === 'function' ? jsQR(imageData.data, imageData.width, imageData.height) : null;
+            if (code && code.data) {
+                handleScanResult(code.data);
+                return;
+            }
+        }
+        scanLoopId = requestAnimationFrame(scanFrame);
+    }
+
+    function handleScanResult(data) {
+        statusEl.textContent = 'Erkannt — öffne…';
+        stopScanner();
+        if (/^https?:\/\//i.test(data)) {
+            window.location.href = data;
+        } else {
+            alert('QR-Code erkannt, aber kein gültiger Assisto-Link:\n' + data);
+        }
+    }
+
+    document.getElementById('scan-btn').addEventListener('click', function() {
+        overlay.hidden = false;
+        statusEl.textContent = 'Kamera wird gestartet…';
+        statusEl.className = 'scanner-status';
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusEl.textContent = 'Dieser Browser unterstützt keinen Kamerazugriff.';
+            statusEl.className = 'scanner-status error';
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(function(s) {
+                stream = s;
+                video.srcObject = stream;
+                statusEl.textContent = 'QR-Code in den Rahmen halten…';
+                scanLoopId = requestAnimationFrame(scanFrame);
+            })
+            .catch(function(err) {
+                statusEl.textContent = 'Kein Kamerazugriff: ' + err.message;
+                statusEl.className = 'scanner-status error';
+            });
+    });
+
+    document.getElementById('scanner-close').addEventListener('click', stopScanner);
+    </script>
 
 </body>
 </html>

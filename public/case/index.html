@@ -93,6 +93,33 @@
             color: var(--soft);
         }
 
+        .like-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--line);
+            background: var(--field);
+            color: var(--muted);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+            .like-btn:hover { border-color: var(--accent); }
+            .like-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+            .like-btn.liked {
+                background: rgba(231, 106, 29, 0.15);
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+            .like-btn .like-icon { font-size: 13px; }
+
         .other-type-note {
             font-size: 12px;
             color: var(--soft);
@@ -206,7 +233,10 @@
 
     <div class="auth-bar" id="auth-bar" hidden>
         <span id="auth-status"></span>
-        <button type="button" class="link" id="logout-btn">Abmelden</button>
+        <span style="display:flex; gap:12px;">
+            <a class="link" href="/account.html" style="text-decoration:none;">Konto</a>
+            <button type="button" class="link" id="logout-btn">Abmelden</button>
+        </span>
     </div>
 
     <div class="login-prompt" id="login-prompt" hidden>
@@ -278,7 +308,10 @@
 
     function buildCaseCardHtml(c, cls) {
         var storedMessages = Array.isArray(c.messages) ? c.messages.filter(Boolean) : [];
-        return '<div class="case-card ' + cls + '">' +
+        var likedBy = Array.isArray(c.likedBy) ? c.likedBy : [];
+        var auth = AssistoAuth.get();
+        var likedByMe = !!(auth && likedBy.indexOf(auth.username) !== -1);
+        return '<div class="case-card ' + cls + '" data-id="' + escapeHtml(c.id) + '">' +
             '<div class="case-meta">' + escapeHtml(new Date(c.timestamp).toLocaleString()) +
                 (c.technician ? ' &middot; ' + escapeHtml(c.technician) : '') +
                 (c.machineType ? ' &middot; ' + escapeHtml(c.machineType) : '') +
@@ -288,6 +321,11 @@
                 : '') +
             '<div class="case-line"><span class="case-label">Cause:</span> ' + escapeHtml(c.cause) + '</div>' +
             '<div class="case-line"><span class="case-label">Remedy:</span> ' + escapeHtml(c.remedy) + '</div>' +
+            '<button type="button" class="like-btn' + (likedByMe ? ' liked' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
+                '<span class="like-icon">' + (likedByMe ? '&#10084;' : '&#9825;') + '</span> ' +
+                '<span class="like-count">' + likedBy.length + '</span>' +
+                '<span class="like-word">' + (likedBy.length === 1 ? ' hat geholfen' : ' fanden das hilfreich') + '</span>' +
+            '</button>' +
         '</div>';
     }
 
@@ -319,6 +357,43 @@
         }
 
         el.innerHTML = html;
+        wireLikeButtons();
+    }
+
+    function wireLikeButtons() {
+        document.querySelectorAll('.like-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var auth = AssistoAuth.get();
+                if (!auth || !auth.token) {
+                    refreshAuthUi();
+                    return;
+                }
+                var id = btn.getAttribute('data-id');
+                btn.disabled = true;
+                fetch('/api/case', {
+                    method: 'PATCH',
+                    headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ id: id })
+                })
+                    .then(function(resp) {
+                        if (resp.status === 401) {
+                            AssistoAuth.clear();
+                            refreshAuthUi();
+                            throw new Error('Session abgelaufen');
+                        }
+                        return resp.json();
+                    })
+                    .then(function(body) {
+                        if (!body.success) throw new Error(body.message || 'Fehlgeschlagen');
+                        btn.classList.toggle('liked', body.liked);
+                        btn.querySelector('.like-icon').innerHTML = body.liked ? '&#10084;' : '&#9825;';
+                        btn.querySelector('.like-count').textContent = body.likes;
+                        btn.querySelector('.like-word').textContent = body.likes === 1 ? ' hat geholfen' : ' fanden das hilfreich';
+                    })
+                    .catch(function(err) { alert(err.message); })
+                    .then(function() { btn.disabled = false; });
+            });
+        });
     }
 
     fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType))

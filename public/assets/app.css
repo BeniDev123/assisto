@@ -66,12 +66,14 @@ button.primary {
     font-size: 13px;
     font-weight: 600;
     border: 1px solid var(--accent);
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
     color: #fff;
+    transition: filter 0.15s, transform 0.1s;
 }
 
-    button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary:hover { filter: brightness(1.08); }
+    button.primary:active { transform: scale(0.98); }
+    button.primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 button.danger {
     padding: 6px 10px;
@@ -81,6 +83,7 @@ button.danger {
     border: 1px solid var(--danger);
     background: transparent;
     color: var(--danger);
+    transition: background 0.15s, color 0.15s;
 }
 
     button.danger:hover { background: var(--danger); color: #fff; }
@@ -92,6 +95,13 @@ button.link {
     font-size: 12px;
     font-weight: 600;
     padding: 0;
+    transition: color 0.15s;
+}
+
+    button.link:hover { color: var(--accent-hover); }
+
+.card {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
 .message {
@@ -142,7 +152,7 @@ button.link {
 .sidebar {
     width: 220px;
     flex-shrink: 0;
-    background: var(--panel);
+    background: linear-gradient(180deg, var(--panel), var(--bg) 220%);
     border-right: 1px solid var(--line);
     padding: 20px 12px;
     display: flex;
@@ -150,20 +160,34 @@ button.link {
 }
 
 .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 700;
     font-size: 17px;
     padding: 0 10px;
     margin-bottom: 22px;
 }
 
+.sidebar-brand::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+
 .sidebar-nav {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .sidebar-nav button {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     width: 100%;
     text-align: left;
     padding: 10px 12px;
@@ -171,11 +195,23 @@ button.link {
     color: var(--muted);
     background: none;
     border: none;
+    border-left: 2px solid transparent;
     font-size: 14px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-    .sidebar-nav button:hover { background: var(--card); }
-    .sidebar-nav button.active { background: var(--card); color: var(--text); font-weight: 600; }
+.sidebar-nav .nav-icon {
+    font-size: 15px;
+    opacity: 0.85;
+}
+
+    .sidebar-nav button:hover { background: var(--card); color: var(--text); }
+    .sidebar-nav button.active {
+        background: var(--card);
+        color: var(--text);
+        font-weight: 600;
+        border-left-color: var(--accent);
+    }
 
 .sidebar-footer {
     margin-top: auto;

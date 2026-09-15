@@ -1,4 +1,4 @@
-import { hashPassword, requireAdmin } from './lib/auth.mjs';
+import { hashPassword, requireAdmin, requireUser } from './lib/auth.mjs';
 import { loadUsers, saveUsers, publicUser } from './lib/users-store.mjs';
 
 function jsonResponse(body, status = 200) {
@@ -59,7 +59,9 @@ async function handlePost(req, admin) {
   return jsonResponse({ success: true, user: publicUser(user) });
 }
 
-async function handlePatch(req) {
+// Admins can change any user's password; anyone else may only change their
+// own (self-service, e.g. from the "Mein Konto" page).
+async function handlePatch(req, admin) {
   let body;
   try {
     body = await req.json();
@@ -70,6 +72,14 @@ async function handlePatch(req) {
   const username = (body.username || '').trim().toLowerCase();
   const password = body.password || '';
   if (!username) return jsonResponse({ success: false, message: 'username is required' }, 400);
+
+  if (!admin) {
+    const self = await requireUser(req);
+    if (!self || self.username !== username) {
+      return jsonResponse({ success: false, message: 'You can only change your own password' }, 403);
+    }
+  }
+
   const passwordError = validatePassword(password);
   if (passwordError) return jsonResponse({ success: false, message: passwordError }, 400);
 
@@ -105,11 +115,13 @@ async function handleDelete(req, admin) {
 
 export default async (req) => {
   const admin = await requireAdmin(req);
+
+  if (req.method === 'PATCH') return handlePatch(req, admin);
+
   if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
 
   if (req.method === 'GET') return handleGet();
   if (req.method === 'POST') return handlePost(req, admin);
-  if (req.method === 'PATCH') return handlePatch(req);
   if (req.method === 'DELETE') return handleDelete(req, admin);
 
   return new Response('Method Not Allowed', { status: 405 });

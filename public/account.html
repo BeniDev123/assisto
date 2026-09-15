@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assisto – Mein Konto</title>
+    <link rel="stylesheet" href="/assets/app.css">
+    <style>
+        .page {
+            max-width: 420px;
+            margin: 0 auto;
+            padding: 24px 16px 60px 16px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 16px;
+        }
+
+        .card h2 {
+            font-size: 15px;
+            margin: 0 0 4px 0;
+        }
+
+        .card p.sub {
+            color: var(--soft);
+            font-size: 12px;
+            margin: 0 0 14px 0;
+        }
+
+        button.primary {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="topbar">
+        <a class="topbar-brand" href="/">Assisto</a>
+        <span class="topbar-status" id="whoami"></span>
+    </div>
+
+    <div class="page">
+
+        <div id="logged-out-notice" class="card" hidden>
+            <p class="sub" style="margin-bottom:0;">Bitte zuerst <a href="/login.html?redirect=/account.html">anmelden</a>.</p>
+        </div>
+
+        <div id="account-content" hidden>
+            <h1 style="font-size:20px;">Mein Konto</h1>
+
+            <div class="card">
+                <h2>Passwort ändern</h2>
+                <p class="sub">Mindestens 8 Zeichen.</p>
+                <form id="pw-form">
+                    <label>Neues Passwort</label>
+                    <input type="password" id="new-password" autocomplete="new-password" />
+                    <label>Neues Passwort bestätigen</label>
+                    <input type="password" id="new-password-confirm" autocomplete="new-password" />
+                    <button type="submit" class="primary" id="pw-submit">Speichern</button>
+                    <div class="message" id="pw-message"></div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/assets/auth-client.js"></script>
+    <script>
+    var auth = AssistoAuth.get();
+
+    if (!auth || !auth.token) {
+        document.getElementById('logged-out-notice').hidden = false;
+    } else {
+        document.getElementById('account-content').hidden = false;
+        document.getElementById('whoami').textContent =
+            auth.username + (auth.role === 'admin' ? ' (Admin)' : '');
+    }
+
+    document.getElementById('pw-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var password = document.getElementById('new-password').value;
+        var confirm = document.getElementById('new-password-confirm').value;
+        var msg = document.getElementById('pw-message');
+        var btn = document.getElementById('pw-submit');
+
+        msg.textContent = '';
+        msg.className = 'message';
+
+        if (password.length < 8) {
+            msg.textContent = 'Mindestens 8 Zeichen.';
+            msg.className = 'message error';
+            return;
+        }
+        if (password !== confirm) {
+            msg.textContent = 'Passwörter stimmen nicht überein.';
+            msg.className = 'message error';
+            return;
+        }
+
+        btn.disabled = true;
+
+        fetch('/api/users', {
+            method: 'PATCH',
+            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ username: auth.username, password: password })
+        })
+            .then(function(resp) {
+                if (resp.status === 401) {
+                    AssistoAuth.clear();
+                    throw new Error('Sitzung abgelaufen — bitte erneut anmelden.');
+                }
+                return resp.json().then(function(b) { return { ok: resp.ok, body: b }; });
+            })
+            .then(function(r) {
+                if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Ändern fehlgeschlagen');
+                msg.textContent = 'Passwort geändert.';
+                msg.className = 'message success';
+                document.getElementById('new-password').value = '';
+                document.getElementById('new-password-confirm').value = '';
+            })
+            .catch(function(err) {
+                msg.textContent = err.message;
+                msg.className = 'message error';
+            })
+            .then(function() { btn.disabled = false; });
+    });
+    </script>
+</body>
+</html>

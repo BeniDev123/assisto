@@ -10,68 +10,6 @@
             overflow-x: hidden;
         }
 
-        .nav {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px 24px;
-            background: rgba(6, 6, 6, 0.75);
-            backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--line);
-        }
-
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            font-size: 17px;
-            text-decoration: none;
-            color: var(--text);
-        }
-
-        .nav-logo {
-            width: 26px;
-            height: 26px;
-            border-radius: 7px;
-            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-        }
-
-        .nav-links a.plain {
-            font-size: 13px;
-            color: var(--muted);
-            text-decoration: none;
-        }
-
-            .nav-links a.plain:hover { color: var(--text); }
-
-        .nav-admin-btn {
-            display: inline-block;
-            padding: 7px 16px;
-            border-radius: 20px;
-            border: 1px solid var(--line);
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text);
-            text-decoration: none;
-            transition: border-color 0.15s, background 0.15s;
-        }
-
-            .nav-admin-btn:hover { border-color: var(--accent); background: var(--panel); }
-
         .hero {
             position: relative;
             display: flex;
@@ -418,16 +356,22 @@
 </head>
 <body>
 
-    <div class="nav">
-        <a class="nav-brand" href="/">
-            <span class="nav-logo">&#128295;</span>
-            Assisto
-        </a>
-        <div class="nav-links">
-            <a class="plain" href="#how">So funktioniert's</a>
-            <a class="nav-admin-btn" href="/admin/">Admin</a>
+    <div class="app-shell">
+
+        <div class="mobile-topbar">
+            <button type="button" class="hamburger-btn" id="hamburger-btn">☰</button>
+            <span class="topbar-brand">Assisto</span>
         </div>
-    </div>
+
+        <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-brand">Assisto</div>
+            <div class="sidebar-identity" id="app-identity"></div>
+            <nav class="sidebar-nav" id="app-nav"></nav>
+        </div>
+
+        <div class="app-main" style="padding:0;">
 
     <div class="hero">
         <div class="hero-copy">
@@ -511,6 +455,9 @@
         <p>Assisto braucht eine Verbindung auf dem Handy &mdash; die Maschine selbst arbeitet vollständig offline.</p>
     </footer>
 
+        </div>
+    </div>
+
     <div class="scanner-overlay" id="scanner-overlay" hidden>
         <div class="scanner-bar">
             <span class="topbar-brand">QR-Code scannen</span>
@@ -525,6 +472,8 @@
 
     <canvas id="scanner-canvas" hidden></canvas>
 
+    <script src="/assets/auth-client.js"></script>
+    <script src="/assets/sidebar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script>
     var overlay = document.getElementById('scanner-overlay');

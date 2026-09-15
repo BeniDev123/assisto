@@ -184,7 +184,7 @@ button.link {
     gap: 2px;
 }
 
-.sidebar-nav button {
+.sidebar-nav button, .sidebar-nav a.sidebar-link {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -197,6 +197,7 @@ button.link {
     border: none;
     border-left: 2px solid transparent;
     font-size: 14px;
+    text-decoration: none;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
@@ -205,13 +206,51 @@ button.link {
     opacity: 0.85;
 }
 
-    .sidebar-nav button:hover { background: var(--card); color: var(--text); }
-    .sidebar-nav button.active {
+    .sidebar-nav button:hover, .sidebar-nav a.sidebar-link:hover { background: var(--card); color: var(--text); }
+    .sidebar-nav button.active, .sidebar-nav a.sidebar-link.active {
         background: var(--card);
         color: var(--text);
         font-weight: 600;
         border-left-color: var(--accent);
     }
+
+.sidebar-identity {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 18px;
+}
+
+.identity-name {
+    font-size: 14px;
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.identity-name-muted {
+    color: var(--soft);
+    font-weight: 500;
+}
+
+.identity-role {
+    font-size: 11px;
+    color: var(--soft);
+    margin: 2px 0 8px 0;
+}
+
+.identity-logout {
+    font-size: 12px;
+}
+
+a.identity-login {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 8px 10px;
+    margin-top: 6px;
+}
 
 .sidebar-footer {
     margin-top: auto;

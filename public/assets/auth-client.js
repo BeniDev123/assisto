@@ -65,6 +65,20 @@ var AssistoAuth = (function() {
         return !!getMasterSecret() || isAdmin();
     }
 
+    // Identity for UI purposes (sidebar, "who am I"): a real logged-in user,
+    // or a synthetic admin identity when accessing via the master secret -
+    // there's no user record behind that, but the UI should still treat it
+    // as "signed in with full admin rights".
+    function getEffective() {
+        if (getMasterSecret()) return { username: 'Master-Zugang', role: 'admin', isMaster: true };
+        return get();
+    }
+
+    function logoutEffective() {
+        if (getMasterSecret()) clearMasterSecret();
+        else clear();
+    }
+
     return {
         get: get,
         set: set,
@@ -75,6 +89,8 @@ var AssistoAuth = (function() {
         setMasterSecret: setMasterSecret,
         clearMasterSecret: clearMasterSecret,
         adminHeaders: adminHeaders,
-        hasAdminAccess: hasAdminAccess
+        hasAdminAccess: hasAdminAccess,
+        getEffective: getEffective,
+        logoutEffective: logoutEffective
     };
 })();

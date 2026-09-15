@@ -103,7 +103,10 @@ async function handlePost(store, req) {
 }
 
 export default async (req) => {
-  const store = getStore(STORE_NAME);
+  // Strong consistency: a technician who just submitted a case immediately
+  // re-fetches the list to see it reflected - the default "eventual"
+  // consistency briefly returned stale (empty) results in testing.
+  const store = getStore({ name: STORE_NAME, consistency: 'strong' });
   const url = new URL(req.url);
 
   if (req.method === 'GET') return handleGet(store, url);

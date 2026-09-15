@@ -4,122 +4,85 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assisto – Admin</title>
+    <link rel="stylesheet" href="/assets/app.css">
     <style>
-        :root {
-            --bg: #060606;
-            --panel: #1A1A1A;
-            --card: #2B2B2B;
-            --field: #373737;
-            --line: #555555;
-            --text: #FFFFFF;
-            --muted: #CFCFCF;
-            --soft: #9CA3AF;
-            --accent: #E76A1D;
-            --accent-hover: #FF833A;
-            --success: #67C967;
-            --danger: #F53232;
-        }
-
-        * { box-sizing: border-box; }
-
-        [hidden] { display: none !important; }
-
-        html, body {
-            margin: 0;
-            padding: 0;
-            font-family: "Segoe UI", Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-        }
-
-        body {
-            padding: 20px 16px 60px 16px;
-            max-width: 640px;
-            margin: 0 auto;
-        }
-
-        header {
+        .center-page {
+            min-height: 100vh;
             display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            margin-bottom: 20px;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
 
-        header h1 { margin: 0; font-size: 22px; }
-        header p { margin: 0; font-size: 13px; color: var(--soft); }
+        .card {
+            width: 100%;
+            max-width: 360px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 20px;
+        }
 
-        button.link {
-            background: none;
-            border: none;
-            color: var(--accent);
+        .card h1 {
+            font-size: 20px;
+            margin: 0 0 4px 0;
+        }
+
+        .card p.sub {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 8px 0 16px 0;
+        }
+
+        .card a.primary {
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            margin-bottom: 16px;
+        }
+
+        .panel h1 {
+            font-size: 22px;
+            margin: 0 0 18px 0;
+        }
+
+        .panel h2 {
+            font-size: 15px;
+            margin: 0 0 12px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        .stat-label {
             font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
-            padding: 0;
+            color: var(--soft);
+            margin-top: 2px;
         }
 
-        section {
+        section.panel-card {
             background: var(--panel);
             border: 1px solid var(--line);
             border-radius: 10px;
             padding: 16px;
             margin-bottom: 18px;
         }
-
-        section h2 {
-            font-size: 15px;
-            margin: 0 0 12px 0;
-        }
-
-        label {
-            display: block;
-            font-size: 12px;
-            color: var(--soft);
-            margin-bottom: 4px;
-        }
-
-        input[type="text"], input[type="password"], textarea, select {
-            width: 100%;
-            background: var(--field);
-            color: var(--text);
-            border: 1px solid var(--line);
-            border-radius: 7px;
-            padding: 9px 10px;
-            font-size: 14px;
-            font-family: inherit;
-            margin-bottom: 12px;
-            resize: vertical;
-        }
-
-        button.primary {
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            border: 1px solid var(--accent);
-            background: var(--accent);
-            color: #fff;
-            cursor: pointer;
-            font-family: inherit;
-        }
-
-            button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-            button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        button.danger {
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid var(--danger);
-            background: transparent;
-            color: var(--danger);
-            cursor: pointer;
-            font-family: inherit;
-        }
-
-            button.danger:hover { background: var(--danger); color: #fff; }
 
         .row {
             display: flex;
@@ -131,7 +94,8 @@
             font-size: 13px;
         }
 
-            .row:last-child { border-bottom: none; }
+        .row-main { flex: 1; min-width: 0; }
+        .row-role { font-size: 11px; color: var(--soft); }
 
         .user-card {
             border-bottom: 1px solid var(--line);
@@ -145,16 +109,7 @@
             padding-top: 8px;
         }
 
-            .pw-panel label {
-                margin-bottom: 4px;
-            }
-
-            .pw-panel input {
-                margin-bottom: 10px;
-            }
-
-        .row-main { flex: 1; min-width: 0; }
-        .row-role { font-size: 11px; color: var(--soft); }
+            .pw-panel input { margin-bottom: 10px; }
 
         .case-card {
             background: var(--card);
@@ -166,74 +121,97 @@
 
         .case-meta { font-size: 11px; color: var(--soft); margin-bottom: 6px; }
         .case-fp { font-size: 11px; color: var(--soft); margin-bottom: 8px; word-break: break-all; }
-
         .case-actions { display: flex; gap: 8px; margin-top: 8px; }
-
-        .message { font-size: 13px; margin-top: 8px; }
-        .message.error { color: var(--danger); }
-        .message.success { color: var(--success); }
-
-        .empty-state, .loading {
-            text-align: center;
-            color: var(--soft);
-            font-size: 13px;
-            padding: 16px 10px;
-        }
     </style>
 </head>
 <body>
 
-    <header>
-        <div>
+    <div id="access-section" class="center-page">
+        <div class="card">
             <h1>Assisto Admin</h1>
-            <p id="whoami"></p>
+            <p class="sub">
+                Mit einem Admin-Account anmelden, oder falls noch keiner existiert,
+                den Master-Schlüssel (<code>ASSISTO_ADMIN_SECRET</code>) verwenden.
+            </p>
+            <a class="primary" id="login-link" href="/login.html?redirect=/admin/">Mit Admin-Account anmelden</a>
+            <label>Oder Master-Schlüssel</label>
+            <input type="password" id="master-secret" placeholder="Master-Schlüssel" />
+            <button type="button" class="primary" id="master-btn" style="width:100%;">Mit Master-Schlüssel fortfahren</button>
+            <div class="message error" id="access-message"></div>
         </div>
-        <button type="button" class="link" id="logout-btn" hidden>Abmelden</button>
-    </header>
-
-    <section id="access-section">
-        <h2>Zugang</h2>
-        <p style="font-size:13px; color:var(--muted); margin-top:0;">
-            Mit einem Admin-Account anmelden, oder falls noch keiner existiert,
-            den Master-Schlüssel (<code>ASSISTO_ADMIN_SECRET</code>) verwenden.
-        </p>
-        <a class="primary" style="display:inline-block; text-decoration:none; margin-bottom: 14px;"
-           id="login-link" href="/login.html?redirect=/admin/">Mit Admin-Account anmelden</a>
-        <label>Oder Master-Schlüssel</label>
-        <input type="password" id="master-secret" placeholder="Master-Schlüssel" />
-        <button type="button" class="primary" id="master-btn">Mit Master-Schlüssel fortfahren</button>
-        <div class="message" id="access-message"></div>
-    </section>
-
-    <div id="admin-body" hidden>
-
-        <section id="users-section">
-            <h2>Benutzer</h2>
-            <div id="users-list"><div class="loading">Lade…</div></div>
-
-            <h2 style="margin-top:18px;">Neuen Benutzer anlegen</h2>
-            <form id="create-user-form">
-                <label>Benutzername</label>
-                <input type="text" id="new-username" autocapitalize="off" placeholder="z.B. m.mueller" />
-                <label>Passwort (mind. 8 Zeichen)</label>
-                <input type="password" id="new-password" />
-                <label>Rolle</label>
-                <select id="new-role">
-                    <option value="technician">Techniker</option>
-                    <option value="admin">Admin</option>
-                </select>
-                <button type="submit" class="primary" id="create-user-btn">Anlegen</button>
-                <div class="message" id="create-user-message"></div>
-            </form>
-        </section>
-
-        <section id="cases-section">
-            <h2>Gemeldete Fälle</h2>
-            <div id="cases-list"><div class="loading">Lade…</div></div>
-        </section>
-
     </div>
 
+    <div class="app-shell" id="admin-shell" hidden>
+
+        <div class="mobile-topbar">
+            <button type="button" class="hamburger-btn" id="hamburger-btn">☰</button>
+            <span class="topbar-brand">Assisto Admin</span>
+        </div>
+
+        <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-brand">Assisto Admin</div>
+            <nav class="sidebar-nav">
+                <button type="button" data-section="overview" class="active">Übersicht</button>
+                <button type="button" data-section="users">Benutzer</button>
+                <button type="button" data-section="cases">Fälle</button>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="whoami" id="whoami"></div>
+                <button type="button" class="link" id="logout-btn">Abmelden</button>
+            </div>
+        </div>
+
+        <div class="app-main">
+
+            <section class="panel" id="panel-overview">
+                <h1>Übersicht</h1>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-users">–</div>
+                        <div class="stat-label">Benutzer</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-cases">–</div>
+                        <div class="stat-label">Gemeldete Fälle</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="panel-users" hidden>
+                <h1>Benutzer</h1>
+                <section class="panel-card">
+                    <h2>Alle Benutzer</h2>
+                    <div id="users-list"><div class="loading">Lade…</div></div>
+                </section>
+                <section class="panel-card">
+                    <h2>Neuen Benutzer anlegen</h2>
+                    <form id="create-user-form">
+                        <label>Benutzername</label>
+                        <input type="text" id="new-username" autocapitalize="off" placeholder="z.B. m.mueller" />
+                        <label>Passwort (mind. 8 Zeichen)</label>
+                        <input type="password" id="new-password" />
+                        <label>Rolle</label>
+                        <select id="new-role">
+                            <option value="technician">Techniker</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button type="submit" class="primary" id="create-user-btn">Anlegen</button>
+                        <div class="message" id="create-user-message"></div>
+                    </form>
+                </section>
+            </section>
+
+            <section class="panel" id="panel-cases" hidden>
+                <h1>Gemeldete Fälle</h1>
+                <div id="cases-list"><div class="loading">Lade…</div></div>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="/assets/auth-client.js"></script>
     <script>
     function escapeHtml(str) {
         return String(str)
@@ -243,53 +221,23 @@
             .replace(/"/g, '&quot;');
     }
 
-    function getUserAuth() {
-        try {
-            var raw = localStorage.getItem('assistoAuth');
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) { return null; }
-    }
-
-    function getMasterSecret() {
-        return sessionStorage.getItem('assistoAdminSecret');
-    }
-
-    function adminHeaders(extra) {
-        var headers = Object.assign({}, extra);
-        var master = getMasterSecret();
-        var userAuth = getUserAuth();
-        if (master) {
-            headers['X-Admin-Secret'] = master;
-        } else if (userAuth && userAuth.token) {
-            headers['Authorization'] = 'Bearer ' + userAuth.token;
-        }
-        return headers;
-    }
-
-    function hasAdminAccess() {
-        var userAuth = getUserAuth();
-        return !!getMasterSecret() || (userAuth && userAuth.role === 'admin');
-    }
-
     function logout() {
-        sessionStorage.removeItem('assistoAdminSecret');
-        var userAuth = getUserAuth();
-        if (userAuth && userAuth.role === 'admin') localStorage.removeItem('assistoAuth');
+        AssistoAuth.clearMasterSecret();
+        if (AssistoAuth.isAdmin()) AssistoAuth.clear();
         updateAccessUi();
     }
 
     function updateAccessUi() {
-        var access = hasAdminAccess();
+        var access = AssistoAuth.hasAdminAccess();
         document.getElementById('access-section').hidden = access;
-        document.getElementById('admin-body').hidden = !access;
-        document.getElementById('logout-btn').hidden = !access;
+        document.getElementById('admin-shell').hidden = !access;
 
-        var userAuth = getUserAuth();
+        var auth = AssistoAuth.get();
         var whoami = document.getElementById('whoami');
-        if (getMasterSecret()) {
+        if (AssistoAuth.getMasterSecret()) {
             whoami.textContent = 'Zugang über Master-Schlüssel';
-        } else if (userAuth && userAuth.role === 'admin') {
-            whoami.textContent = 'Angemeldet als ' + userAuth.username + ' (Admin)';
+        } else if (auth && auth.role === 'admin') {
+            whoami.textContent = 'Angemeldet als ' + auth.username + ' (Admin)';
         } else {
             whoami.textContent = '';
         }
@@ -307,32 +255,67 @@
         var msg = document.getElementById('access-message');
         if (!value) {
             msg.textContent = 'Bitte Master-Schlüssel eingeben.';
-            msg.className = 'message error';
             return;
         }
-        sessionStorage.setItem('assistoAdminSecret', value);
+        AssistoAuth.setMasterSecret(value);
 
-        fetch('/api/users', { headers: adminHeaders() })
+        fetch('/api/users', { headers: AssistoAuth.adminHeaders() })
             .then(function(resp) {
                 if (!resp.ok) throw new Error('Ungültiger Master-Schlüssel');
                 msg.textContent = '';
                 updateAccessUi();
             })
             .catch(function(err) {
-                sessionStorage.removeItem('assistoAdminSecret');
+                AssistoAuth.clearMasterSecret();
                 msg.textContent = err.message;
-                msg.className = 'message error';
             });
     });
 
+    // Sidebar navigation between panels
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebar-backdrop');
+
+    function showSection(name) {
+        document.querySelectorAll('.panel').forEach(function(panel) {
+            panel.hidden = panel.id !== 'panel-' + name;
+        });
+        document.querySelectorAll('.sidebar-nav button').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-section') === name);
+        });
+        closeSidebar();
+    }
+
+    document.querySelectorAll('.sidebar-nav button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            showSection(btn.getAttribute('data-section'));
+        });
+    });
+
+    function openSidebar() {
+        sidebar.classList.add('open');
+        backdrop.hidden = false;
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        backdrop.hidden = true;
+    }
+
+    document.getElementById('hamburger-btn').addEventListener('click', openSidebar);
+    backdrop.addEventListener('click', closeSidebar);
+
     function loadUsers() {
-        fetch('/api/users', { headers: adminHeaders() })
+        fetch('/api/users', { headers: AssistoAuth.adminHeaders() })
             .then(function(resp) {
                 if (resp.status === 401) { logout(); throw new Error('Zugang abgelaufen'); }
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 return resp.json();
             })
-            .then(function(data) { renderUsers(data.users || []); })
+            .then(function(data) {
+                var users = data.users || [];
+                document.getElementById('stat-users').textContent = users.length;
+                renderUsers(users);
+            })
             .catch(function(err) {
                 document.getElementById('users-list').innerHTML =
                     '<div class="empty-state">Konnte Benutzer nicht laden: ' + escapeHtml(err.message) + '</div>';
@@ -379,7 +362,7 @@
                 if (!confirm('Benutzer "' + username + '" wirklich löschen?')) return;
                 fetch('/api/users?username=' + encodeURIComponent(username), {
                     method: 'DELETE',
-                    headers: adminHeaders()
+                    headers: AssistoAuth.adminHeaders()
                 })
                     .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
                     .then(function(r) {
@@ -405,7 +388,7 @@
                 pwMessage.textContent = '';
                 fetch('/api/users', {
                     method: 'PATCH',
-                    headers: adminHeaders({ 'Content-Type': 'application/json' }),
+                    headers: AssistoAuth.adminHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ username: username, password: password })
                 })
                     .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
@@ -436,7 +419,7 @@
 
         fetch('/api/users', {
             method: 'POST',
-            headers: adminHeaders({ 'Content-Type': 'application/json' }),
+            headers: AssistoAuth.adminHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ username: username, password: password, role: role })
         })
             .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
@@ -456,13 +439,17 @@
     });
 
     function loadCases() {
-        fetch('/api/case?all=1', { headers: adminHeaders() })
+        fetch('/api/case?all=1', { headers: AssistoAuth.adminHeaders() })
             .then(function(resp) {
                 if (resp.status === 401) { logout(); throw new Error('Zugang abgelaufen'); }
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 return resp.json();
             })
-            .then(function(data) { renderCases(data.cases || []); })
+            .then(function(data) {
+                var cases = data.cases || [];
+                document.getElementById('stat-cases').textContent = cases.length;
+                renderCases(cases);
+            })
             .catch(function(err) {
                 document.getElementById('cases-list').innerHTML =
                     '<div class="empty-state">Konnte Fälle nicht laden: ' + escapeHtml(err.message) + '</div>';
@@ -503,7 +490,7 @@
                 var remedy = card.querySelector('.edit-remedy').value.trim();
                 fetch('/api/case', {
                     method: 'PUT',
-                    headers: adminHeaders({ 'Content-Type': 'application/json' }),
+                    headers: AssistoAuth.adminHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ id: id, cause: cause, remedy: remedy })
                 })
                     .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
@@ -522,12 +509,14 @@
                 if (!confirm('Diesen Fall wirklich löschen?')) return;
                 fetch('/api/case?id=' + encodeURIComponent(id), {
                     method: 'DELETE',
-                    headers: adminHeaders()
+                    headers: AssistoAuth.adminHeaders()
                 })
                     .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
                     .then(function(r) {
                         if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
                         card.remove();
+                        var current = parseInt(document.getElementById('stat-cases').textContent, 10);
+                        if (!isNaN(current)) document.getElementById('stat-cases').textContent = current - 1;
                     })
                     .catch(function(err) { alert(err.message); });
             });

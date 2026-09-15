@@ -4,17 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assisto</title>
+    <link rel="stylesheet" href="/assets/app.css">
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            background: #060606;
-            color: #fff;
-            font-family: "Segoe UI", Arial, sans-serif;
-        }
-
-        body {
+        .hero {
+            min-height: calc(100vh - 53px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -22,13 +15,13 @@
             padding: 20px;
         }
 
-        h1 {
+        .hero h1 {
             font-size: 26px;
             margin: 0 0 8px 0;
         }
 
-        p {
-            color: #9CA3AF;
+        .hero p {
+            color: var(--soft);
             font-size: 14px;
             margin: 0;
             max-width: 320px;
@@ -36,9 +29,18 @@
     </style>
 </head>
 <body>
-    <div>
-        <h1>Assisto</h1>
-        <p>Scan the QR code on a machine's fault screen to get cause &amp; remedy help for that specific error.</p>
+
+    <div class="topbar">
+        <span class="topbar-brand">Assisto</span>
+        <span class="topbar-status"><a href="/admin/">Admin</a></span>
     </div>
+
+    <div class="hero">
+        <div>
+            <h1>Assisto</h1>
+            <p>Scan the QR code on a machine's fault screen to get cause &amp; remedy help for that specific error.</p>
+        </div>
+    </div>
+
 </body>
 </html>

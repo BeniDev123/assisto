@@ -4,30 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assisto – Login</title>
+    <link rel="stylesheet" href="/assets/app.css">
     <style>
-        :root {
-            --bg: #060606;
-            --panel: #1A1A1A;
-            --field: #373737;
-            --line: #555555;
-            --text: #FFFFFF;
-            --soft: #9CA3AF;
-            --accent: #E76A1D;
-            --accent-hover: #FF833A;
-            --danger: #F53232;
-        }
-
-        * { box-sizing: border-box; }
-
-        html, body {
-            margin: 0;
-            padding: 0;
-            background: var(--bg);
-            color: var(--text);
-            font-family: "Segoe UI", Arial, sans-serif;
-        }
-
-        body {
+        .center-page {
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -44,77 +23,46 @@
             padding: 20px;
         }
 
-        h1 {
+        .card h1 {
             font-size: 20px;
             margin: 0 0 4px 0;
             text-align: center;
         }
 
-        p.sub {
+        .card p.sub {
             color: var(--soft);
             font-size: 13px;
             text-align: center;
             margin: 0 0 18px 0;
         }
 
-        label {
-            display: block;
-            font-size: 12px;
-            color: var(--soft);
-            margin-bottom: 4px;
-        }
-
-        input[type="text"], input[type="password"] {
+        .card button.primary {
             width: 100%;
-            background: var(--field);
-            color: var(--text);
-            border: 1px solid var(--line);
-            border-radius: 7px;
-            padding: 9px 10px;
-            font-size: 14px;
-            font-family: inherit;
-            margin-bottom: 12px;
         }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            border: 1px solid var(--accent);
-            background: var(--accent);
-            color: #fff;
-            cursor: pointer;
-            font-family: inherit;
-        }
-
-            button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-            button:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .message {
-            font-size: 13px;
-            margin-top: 12px;
             text-align: center;
-            color: var(--danger);
         }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1>Assisto</h1>
-        <p class="sub">Anmelden, um eine Lösung zu teilen</p>
-        <form id="login-form">
-            <label>Benutzername</label>
-            <input type="text" id="username" autocomplete="username" autocapitalize="off" />
-            <label>Passwort</label>
-            <input type="password" id="password" autocomplete="current-password" />
-            <button type="submit" id="submit-btn">Anmelden</button>
-            <div class="message" id="message"></div>
-        </form>
+    <div class="center-page">
+        <div class="card">
+            <h1>Assisto</h1>
+            <p class="sub">Anmelden, um eine Lösung zu teilen</p>
+            <form id="login-form">
+                <label>Benutzername</label>
+                <input type="text" id="username" autocomplete="username" autocapitalize="off" />
+                <label>Passwort</label>
+                <input type="password" id="password" autocomplete="current-password" />
+                <button type="submit" class="primary" id="submit-btn">Anmelden</button>
+                <div class="message error" id="message"></div>
+            </form>
+        </div>
     </div>
 
+    <script src="/assets/auth-client.js"></script>
     <script>
     var params = new URLSearchParams(window.location.search);
     var redirect = params.get('redirect') || '/';
@@ -144,11 +92,11 @@
                 if (!result.ok || !result.body.success) {
                     throw new Error(result.body.message || 'Anmeldung fehlgeschlagen');
                 }
-                localStorage.setItem('assistoAuth', JSON.stringify({
+                AssistoAuth.set({
                     token: result.body.token,
                     username: result.body.username,
                     role: result.body.role
-                }));
+                });
                 window.location.href = redirect;
             })
             .catch(function(err) {

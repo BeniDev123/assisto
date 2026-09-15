@@ -4,62 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assisto – Case Help</title>
+    <link rel="stylesheet" href="/assets/app.css">
     <style>
-        :root {
-            --bg: #060606;
-            --panel: #1A1A1A;
-            --card: #2B2B2B;
-            --field: #373737;
-            --line: #555555;
-            --text: #FFFFFF;
-            --muted: #CFCFCF;
-            --soft: #9CA3AF;
-            --accent: #E76A1D;
-            --accent-hover: #FF833A;
-            --success: #67C967;
-            --warning: #F5D151;
-            --danger: #F53232;
-            --info: #60A5FA;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        [hidden] {
-            display: none !important;
-        }
-
-        html, body {
-            margin: 0;
-            padding: 0;
-            font-family: "Segoe UI", Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-        }
-
         body {
-            padding: 20px 16px 60px 16px;
+            padding-bottom: 40px;
+        }
+
+        .page {
+            padding: 20px 16px 20px 16px;
             max-width: 480px;
             margin: 0 auto;
         }
-
-        header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-            header h1 {
-                margin: 0;
-                font-size: 24px;
-                font-weight: 700;
-            }
-
-            header p {
-                margin: 4px 0 0 0;
-                font-size: 13px;
-                color: var(--soft);
-            }
 
         .context-card {
             background: var(--panel);
@@ -148,20 +103,6 @@
             margin-bottom: 10px;
         }
 
-        .empty-state {
-            text-align: center;
-            color: var(--soft);
-            font-size: 13px;
-            padding: 20px 10px;
-        }
-
-        .loading {
-            text-align: center;
-            color: var(--soft);
-            font-size: 13px;
-            padding: 30px 10px;
-        }
-
         form {
             background: var(--panel);
             border: 1px solid var(--accent);
@@ -175,57 +116,13 @@
             margin: 0 0 12px 0;
         }
 
-        label {
-            display: block;
-            font-size: 12px;
-            color: var(--soft);
-            margin-bottom: 4px;
-        }
-
-        textarea, input[type="text"] {
+        form button.primary {
             width: 100%;
-            background: var(--field);
-            color: var(--text);
-            border: 1px solid var(--line);
-            border-radius: 7px;
-            padding: 9px 10px;
-            font-size: 14px;
-            font-family: inherit;
-            margin-bottom: 12px;
-            resize: vertical;
         }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            border: 1px solid var(--accent);
-            background: var(--accent);
-            color: #fff;
-            cursor: pointer;
-            font-family: inherit;
-        }
-
-            button:hover {
-                background: var(--accent-hover);
-                border-color: var(--accent-hover);
-            }
-
-            button:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-            }
 
         .form-message {
-            font-size: 13px;
-            margin-top: 10px;
             text-align: center;
         }
-
-            .form-message.error { color: var(--danger); }
-            .form-message.success { color: var(--success); }
 
         .offline-note {
             font-size: 11px;
@@ -245,19 +142,6 @@
             margin-top: 22px;
             font-size: 12px;
             color: var(--soft);
-        }
-
-        .auth-bar a, .auth-bar button.link {
-            color: var(--accent);
-            text-decoration: none;
-            background: none;
-            border: none;
-            padding: 0;
-            width: auto;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
         }
 
         .login-prompt {
@@ -293,10 +177,12 @@
 </head>
 <body>
 
-    <header>
-        <h1>Assisto</h1>
-        <p>Machine fault help</p>
-    </header>
+    <div class="topbar">
+        <a class="topbar-brand" href="/">Assisto</a>
+        <span class="topbar-status">Machine fault help</span>
+    </div>
+
+    <div class="page">
 
     <div class="context-card">
         <div class="context-label">This fault combination</div>
@@ -314,8 +200,8 @@
         <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
         <label>Remedy</label>
         <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
-        <button type="submit" id="form-submit">Submit</button>
-        <div class="form-message" id="form-message"></div>
+        <button type="submit" class="primary" id="form-submit">Submit</button>
+        <div class="message form-message" id="form-message"></div>
     </form>
 
     <div class="auth-bar" id="auth-bar" hidden>
@@ -330,6 +216,9 @@
 
     <div class="offline-note">This page needs a connection on your phone &mdash; the machine itself works fully offline.</div>
 
+    </div>
+
+    <script src="/assets/auth-client.js"></script>
     <script>
     function escapeHtml(str) {
         return String(str)
@@ -355,25 +244,12 @@
         : '<span class="context-id">no Id in link</span>';
     document.getElementById('context-type').textContent = machineType ? 'Machine type: ' + machineType : 'Machine type: unknown';
 
-    function getAuth() {
-        try {
-            var raw = localStorage.getItem('assistoAuth');
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function clearAuth() {
-        localStorage.removeItem('assistoAuth');
-    }
-
     function currentUrl() {
         return window.location.pathname + window.location.search;
     }
 
     function refreshAuthUi() {
-        var auth = getAuth();
+        var auth = AssistoAuth.get();
         var form = document.getElementById('submit-form');
         var authBar = document.getElementById('auth-bar');
         var loginPrompt = document.getElementById('login-prompt');
@@ -394,7 +270,7 @@
     }
 
     document.getElementById('logout-btn').addEventListener('click', function() {
-        clearAuth();
+        AssistoAuth.clear();
         refreshAuthUi();
     });
 
@@ -463,7 +339,7 @@
         var remedy = document.getElementById('form-remedy').value.trim();
         var messageEl = document.getElementById('form-message');
         var submitBtn = document.getElementById('form-submit');
-        var auth = getAuth();
+        var auth = AssistoAuth.get();
 
         if (!auth || !auth.token) {
             refreshAuthUi();
@@ -472,20 +348,17 @@
 
         if (!cause || !remedy) {
             messageEl.textContent = 'Please fill in cause and remedy.';
-            messageEl.className = 'form-message error';
+            messageEl.className = 'message form-message error';
             return;
         }
 
         submitBtn.disabled = true;
         messageEl.textContent = '';
-        messageEl.className = 'form-message';
+        messageEl.className = 'message form-message';
 
         fetch('/api/case', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + auth.token
-            },
+            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({
                 fingerprint: fp,
                 machineType: machineType,
@@ -496,7 +369,7 @@
         })
             .then(function(resp) {
                 if (resp.status === 401) {
-                    clearAuth();
+                    AssistoAuth.clear();
                     refreshAuthUi();
                     throw new Error('Session abgelaufen — bitte erneut anmelden.');
                 }
@@ -505,7 +378,7 @@
             })
             .then(function() {
                 messageEl.textContent = 'Thanks — shared with everyone who scans this fault.';
-                messageEl.className = 'form-message success';
+                messageEl.className = 'message form-message success';
                 document.getElementById('form-cause').value = '';
                 document.getElementById('form-remedy').value = '';
                 return fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType));
@@ -514,7 +387,7 @@
             .then(renderResults)
             .catch(function(err) {
                 messageEl.textContent = 'Save failed: ' + err.message;
-                messageEl.className = 'form-message error';
+                messageEl.className = 'message form-message error';
             })
             .then(function() {
                 submitBtn.disabled = false;

@@ -275,18 +275,28 @@
     var fp = params.get('fp') || '';
     var machineType = params.get('type') || '';
     var ids = fp.split('|').filter(Boolean);
+    // Optional - the QR code drops this for very large packets to stay
+    // scannable, so it may be shorter than `ids` or missing entirely.
+    var messages = (params.get('msg') || '').split('|').filter(Boolean);
 
     document.getElementById('context-ids').innerHTML = ids.length
-        ? ids.map(function(id) { return '<span class="context-id">' + escapeHtml(id) + '</span>'; }).join('')
+        ? ids.map(function(id, i) {
+            var msg = messages[i];
+            return '<span class="context-id">' + escapeHtml(id) + (msg ? ' &mdash; ' + escapeHtml(msg) : '') + '</span>';
+        }).join('')
         : '<span class="context-id">no Id in link</span>';
     document.getElementById('context-type').textContent = machineType ? 'Machine type: ' + machineType : 'Machine type: unknown';
 
     function buildCaseCardHtml(c, cls) {
+        var storedMessages = Array.isArray(c.messages) ? c.messages.filter(Boolean) : [];
         return '<div class="case-card ' + cls + '">' +
             '<div class="case-meta">' + escapeHtml(new Date(c.timestamp).toLocaleString()) +
                 (c.technician ? ' &middot; ' + escapeHtml(c.technician) : '') +
                 (c.machineType ? ' &middot; ' + escapeHtml(c.machineType) : '') +
             '</div>' +
+            (storedMessages.length
+                ? '<div class="case-line" style="margin-bottom:6px;">' + storedMessages.map(escapeHtml).join(' &middot; ') + '</div>'
+                : '') +
             '<div class="case-line"><span class="case-label">Cause:</span> ' + escapeHtml(c.cause) + '</div>' +
             '<div class="case-line"><span class="case-label">Remedy:</span> ' + escapeHtml(c.remedy) + '</div>' +
         '</div>';
@@ -358,6 +368,7 @@
             body: JSON.stringify({
                 fingerprint: fp,
                 machineType: machineType,
+                messages: messages,
                 cause: cause,
                 remedy: remedy,
                 technician: technician

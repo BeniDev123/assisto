@@ -80,6 +80,7 @@ async function handlePost(store, req) {
   const remedy = (body.remedy || '').trim();
   const machineType = (body.machineType || '').trim();
   const technician = (body.technician || '').trim();
+  const messages = Array.isArray(body.messages) ? body.messages.map((m) => String(m).trim()).filter(Boolean) : [];
 
   if (!fingerprint || !cause || !remedy) {
     return jsonResponse({ success: false, message: 'fingerprint, cause and remedy are required' }, 400);
@@ -92,6 +93,7 @@ async function handlePost(store, req) {
     machineType: machineType || '---',
     timestamp: new Date().toISOString(),
     technician,
+    messages,
     cause,
     remedy,
   };

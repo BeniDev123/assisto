@@ -166,19 +166,9 @@ async function handlePut(store, req) {
 
 // Any logged-in user can like/unlike a case ("this helped me") - toggles
 // their username in and out of the case's likedBy list.
-async function handleToggleLike(store, req) {
+async function handleToggleLike(store, req, id) {
   const user = await requireUser(req);
   if (!user) return jsonResponse({ success: false, message: 'Login required to like a case' }, 401);
-
-  let body;
-  try {
-    body = await req.json();
-  } catch (err) {
-    return jsonResponse({ success: false, message: `Invalid JSON: ${err.message}` }, 400);
-  }
-
-  const id = (body.id || '').trim();
-  if (!id) return jsonResponse({ success: false, message: 'id is required' }, 400);
 
   const cases = await loadCases(store);
   const entry = cases.find((c) => c.id === id);
@@ -192,6 +182,95 @@ async function handleToggleLike(store, req) {
 
   await store.setJSON(BLOB_KEY, cases);
   return jsonResponse({ success: true, liked, likes: entry.likedBy.length });
+}
+
+// Admins mark a case as verified ("checked and confirmed correct") - a
+// stronger trust signal than likes, shown as a badge to everyone.
+async function handleSetVerified(store, req, id, verified) {
+  const admin = await requireAdmin(req);
+  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
+
+  const cases = await loadCases(store);
+  const entry = cases.find((c) => c.id === id);
+  if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
+
+  entry.verified = verified;
+  if (verified) {
+    entry.verifiedBy = admin.username;
+    entry.verifiedAt = new Date().toISOString();
+  } else {
+    delete entry.verifiedBy;
+    delete entry.verifiedAt;
+  }
+
+  await store.setJSON(BLOB_KEY, cases);
+  return jsonResponse({ success: true, verified: entry.verified });
+}
+
+async function handlePatch(store, req) {
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return jsonResponse({ success: false, message: `Invalid JSON: ${err.message}` }, 400);
+  }
+
+  const id = (body.id || '').trim();
+  if (!id) return jsonResponse({ success: false, message: 'id is required' }, 400);
+
+  if (typeof body.verified === 'boolean') {
+    return handleSetVerified(store, req, id, body.verified);
+  }
+  return handleToggleLike(store, req, id);
+}
+
+// Admin-only export shaped for ControlCenter's local KnownCases.json, so a
+// technician can merge documented fixes back onto a machine that has no
+// internet access itself. Defaults to verified cases only - a submission
+// nobody has checked yet is fine to surface online (with a "not verified"
+// note) but shouldn't get silently baked into a machine's offline file.
+//
+// Two fields can't be reconstructed faithfully:
+// - machineNumber: Assisto's knowledge base is intentionally shared across
+//   machines, so it never collected a specific machine's serial number.
+// - packetSnapshot: locally this holds the *raw* log lines for the packet.
+//   Assisto never sees those (the phone that submits a case only ever had
+//   the Ids/messages baked into the QR code, not the machine's live log) -
+//   so this is synthesized as "<Id> - <message>" lines, good enough for the
+//   local history view but not a byte-identical original log line.
+async function handleExport(req, store, onlyVerified) {
+  const admin = await requireAdmin(req);
+  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
+
+  const cases = await loadCases(store);
+  const filtered = onlyVerified ? cases.filter((c) => c.verified) : cases;
+
+  const exported = filtered.map((c) => {
+    const ids = fingerprintToSet(c.fingerprint);
+    const messages = Array.isArray(c.messages) ? c.messages : [];
+    const packetSnapshot = ids.map((id, i) => (messages[i] ? `${id} - ${messages[i]}` : id));
+    const timestamp = (c.timestamp || '').replace('T', ' ').replace(/\.\d+Z?$/, '').replace(/Z$/, '');
+
+    return {
+      id: c.id,
+      fingerprint: c.fingerprint,
+      machineType: c.machineType || '---',
+      machineNumber: '---',
+      timestamp,
+      technician: c.technician || '',
+      cause: c.cause,
+      remedy: c.remedy,
+      packetSnapshot,
+    };
+  });
+
+  return new Response(JSON.stringify(exported, null, 2), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename="assisto-known-cases-export.json"',
+    },
+  });
 }
 
 async function handleDelete(store, req, url) {
@@ -218,13 +297,16 @@ export default async (req) => {
   const url = new URL(req.url);
 
   if (req.method === 'GET') {
+    if (url.searchParams.get('export') === '1') {
+      return handleExport(req, store, url.searchParams.get('onlyVerified') !== '0');
+    }
     if (url.searchParams.get('all') === '1') return handleGetAll(req, store);
     if (url.searchParams.get('mine') === '1') return handleGetMine(req, store);
     return handleGet(store, url);
   }
   if (req.method === 'POST') return handlePost(store, req);
   if (req.method === 'PUT') return handlePut(store, req);
-  if (req.method === 'PATCH') return handleToggleLike(store, req);
+  if (req.method === 'PATCH') return handlePatch(store, req);
   if (req.method === 'DELETE') return handleDelete(store, req, url);
 
   return new Response('Method Not Allowed', { status: 405 });

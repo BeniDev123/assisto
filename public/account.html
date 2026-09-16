@@ -29,6 +29,19 @@
         button.primary {
             width: 100%;
         }
+
+        .case-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            max-width: 480px;
+        }
+
+        .case-meta { font-size: 11px; color: var(--soft); margin-bottom: 6px; }
+        .case-fp { font-size: 11px; color: var(--soft); margin-bottom: 8px; word-break: break-all; }
+        .case-actions { display: flex; gap: 8px; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -68,6 +81,12 @@
                         <div class="message" id="pw-message"></div>
                     </form>
                 </div>
+
+                <div class="card" style="max-width:480px;">
+                    <h2>Meine gemeldeten Fälle</h2>
+                    <p class="sub">Bearbeite oder lösche Cause/Remedy, die du selbst eingetragen hast.</p>
+                    <div id="my-cases-list"><div class="loading">Lade…</div></div>
+                </div>
             </div>
         </div>
 
@@ -76,12 +95,102 @@
     <script src="/assets/auth-client.js"></script>
     <script src="/assets/sidebar.js"></script>
     <script>
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     var auth = AssistoAuth.get();
 
     if (!auth || !auth.token) {
         document.getElementById('logged-out-notice').hidden = false;
     } else {
         document.getElementById('account-content').hidden = false;
+        loadMyCases();
+    }
+
+    function loadMyCases() {
+        fetch('/api/case?mine=1', { headers: AssistoAuth.headers() })
+            .then(function(resp) {
+                if (resp.status === 401) {
+                    AssistoAuth.clear();
+                    throw new Error('Sitzung abgelaufen — bitte erneut anmelden.');
+                }
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.json();
+            })
+            .then(function(data) { renderMyCases(data.cases || []); })
+            .catch(function(err) {
+                document.getElementById('my-cases-list').innerHTML =
+                    '<div class="empty-state">Konnte Fälle nicht laden: ' + escapeHtml(err.message) + '</div>';
+            });
+    }
+
+    function renderMyCases(cases) {
+        var el = document.getElementById('my-cases-list');
+        if (cases.length === 0) {
+            el.innerHTML = '<div class="empty-state">Du hast noch keine Fälle gemeldet.</div>';
+            return;
+        }
+        el.innerHTML = cases.map(function(c) {
+            return '<div class="case-card" data-id="' + escapeHtml(c.id) + '">' +
+                '<div class="case-meta">' + escapeHtml(new Date(c.timestamp).toLocaleString()) +
+                    (c.machineType ? ' &middot; ' + escapeHtml(c.machineType) : '') +
+                '</div>' +
+                '<div class="case-fp">' + escapeHtml(c.fingerprint) + '</div>' +
+                '<label>Cause</label>' +
+                '<textarea rows="2" class="edit-cause">' + escapeHtml(c.cause) + '</textarea>' +
+                '<label>Remedy</label>' +
+                '<textarea rows="2" class="edit-remedy">' + escapeHtml(c.remedy) + '</textarea>' +
+                '<div class="case-actions">' +
+                    '<button type="button" class="primary save-btn">Speichern</button>' +
+                    '<button type="button" class="danger delete-btn">Löschen</button>' +
+                '</div>' +
+                '<div class="message"></div>' +
+            '</div>';
+        }).join('');
+
+        el.querySelectorAll('.case-card').forEach(function(card) {
+            var id = card.getAttribute('data-id');
+            var msgEl = card.querySelector('.message');
+
+            card.querySelector('.save-btn').addEventListener('click', function() {
+                var cause = card.querySelector('.edit-cause').value.trim();
+                var remedy = card.querySelector('.edit-remedy').value.trim();
+                fetch('/api/case', {
+                    method: 'PUT',
+                    headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ id: id, cause: cause, remedy: remedy })
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Speichern fehlgeschlagen');
+                        msgEl.textContent = 'Gespeichert.';
+                        msgEl.className = 'message success';
+                    })
+                    .catch(function(err) {
+                        msgEl.textContent = err.message;
+                        msgEl.className = 'message error';
+                    });
+            });
+
+            card.querySelector('.delete-btn').addEventListener('click', function() {
+                if (!confirm('Diesen Fall wirklich löschen?')) return;
+                fetch('/api/case?id=' + encodeURIComponent(id), {
+                    method: 'DELETE',
+                    headers: AssistoAuth.headers()
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
+                        card.remove();
+                    })
+                    .catch(function(err) { alert(err.message); });
+            });
+        });
     }
 
     document.getElementById('pw-form').addEventListener('submit', function(e) {

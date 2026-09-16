@@ -47,6 +47,25 @@ async function handleGetAll(req, store) {
   return jsonResponse({ cases: cases.slice().reverse() });
 }
 
+// A technician's own submissions, for the "Mein Konto" page - so they can
+// edit or remove a case without needing admin access.
+async function handleGetMine(req, store) {
+  const user = await requireUser(req);
+  if (!user) return jsonResponse({ success: false, message: 'Login required' }, 401);
+  const cases = await loadCases(store);
+  const mine = cases.filter((c) => c.technician === user.username);
+  return jsonResponse({ cases: mine.slice().reverse() });
+}
+
+// Admins can act on any case; a technician may only act on their own.
+async function requireAdminOrOwner(req, entry) {
+  const admin = await requireAdmin(req);
+  if (admin) return admin;
+  const user = await requireUser(req);
+  if (user && entry && user.username === entry.technician) return user;
+  return null;
+}
+
 async function handleGet(store, url) {
   const fp = url.searchParams.get('fp') || '';
   const type = url.searchParams.get('type') || '';
@@ -115,9 +134,6 @@ async function handlePost(store, req) {
 }
 
 async function handlePut(store, req) {
-  const admin = await requireAdmin(req);
-  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
-
   let body;
   try {
     body = await req.json();
@@ -136,10 +152,13 @@ async function handlePut(store, req) {
   const entry = cases.find((c) => c.id === id);
   if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
 
+  const actor = await requireAdminOrOwner(req, entry);
+  if (!actor) return jsonResponse({ success: false, message: 'Not authorized to edit this case' }, 403);
+
   entry.cause = cause;
   entry.remedy = remedy;
   entry.editedAt = new Date().toISOString();
-  entry.editedBy = admin.username;
+  entry.editedBy = actor.username;
 
   await store.setJSON(BLOB_KEY, cases);
   return jsonResponse({ success: true, entry });
@@ -176,18 +195,17 @@ async function handleToggleLike(store, req) {
 }
 
 async function handleDelete(store, req, url) {
-  const admin = await requireAdmin(req);
-  if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
-
   const id = (url.searchParams.get('id') || '').trim();
   if (!id) return jsonResponse({ success: false, message: 'id query param is required' }, 400);
 
   const cases = await loadCases(store);
-  const remaining = cases.filter((c) => c.id !== id);
-  if (remaining.length === cases.length) {
-    return jsonResponse({ success: false, message: 'Case not found' }, 404);
-  }
+  const entry = cases.find((c) => c.id === id);
+  if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
 
+  const actor = await requireAdminOrOwner(req, entry);
+  if (!actor) return jsonResponse({ success: false, message: 'Not authorized to delete this case' }, 403);
+
+  const remaining = cases.filter((c) => c.id !== id);
   await store.setJSON(BLOB_KEY, remaining);
   return jsonResponse({ success: true });
 }
@@ -200,7 +218,9 @@ export default async (req) => {
   const url = new URL(req.url);
 
   if (req.method === 'GET') {
-    return url.searchParams.get('all') === '1' ? handleGetAll(req, store) : handleGet(store, url);
+    if (url.searchParams.get('all') === '1') return handleGetAll(req, store);
+    if (url.searchParams.get('mine') === '1') return handleGetMine(req, store);
+    return handleGet(store, url);
   }
   if (req.method === 'POST') return handlePost(store, req);
   if (req.method === 'PUT') return handlePut(store, req);

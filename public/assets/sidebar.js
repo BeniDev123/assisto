@@ -18,6 +18,7 @@
 
     var ICONS = {
         home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+        search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
         user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
         chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg>',
         users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17.3" cy="9" r="2.6"/><path d="M14.6 14.7c2.7.3 5.7 2 5.7 5.3"/></svg>',
@@ -25,7 +26,10 @@
     };
 
     function buildNavItems(auth) {
-        var items = [{ href: '/', icon: ICONS.home, label: 'Start' }];
+        var items = [
+            { href: '/', icon: ICONS.home, label: 'Start' },
+            { href: '/search.html', icon: ICONS.search, label: 'Suche' }
+        ];
         if (auth) {
             items.push({ href: '/account.html', icon: ICONS.user, label: 'Mein Konto' });
         }

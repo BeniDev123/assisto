@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assisto – Suche</title>
+    <link rel="stylesheet" href="/assets/app.css">
+    <style>
+        .page {
+            max-width: 560px;
+        }
+
+        .search-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+
+        .search-card h1 {
+            font-size: 18px;
+            margin: 0 0 4px 0;
+        }
+
+        .search-card p.sub {
+            font-size: 12px;
+            color: var(--soft);
+            margin: 0 0 14px 0;
+        }
+
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .search-row > div {
+            flex: 1 1 200px;
+        }
+
+        .search-card label {
+            display: block;
+            font-size: 12px;
+            color: var(--soft);
+            margin-bottom: 4px;
+        }
+
+        .search-card select, .search-card input[type="text"] {
+            width: 100%;
+            background: var(--field);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            padding: 9px 10px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .search-card input[type="text"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+            color: var(--soft);
+        }
+
+        .case-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+
+            .case-card.good { border-color: var(--success); }
+
+        .case-meta {
+            font-size: 11px;
+            color: var(--soft);
+            margin-bottom: 6px;
+        }
+
+        .case-line {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .case-label {
+            color: var(--soft);
+        }
+
+        .verified-icon {
+            display: inline-flex;
+            vertical-align: -2px;
+            color: var(--success);
+        }
+
+            .verified-icon svg { width: 15px; height: 15px; display: block; }
+
+        .like-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--line);
+            background: var(--field);
+            color: var(--text);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+            .like-btn:hover { border-color: var(--accent); }
+            .like-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+            .like-btn.liked {
+                background: rgba(231, 106, 29, 0.15);
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+            .like-btn .like-icon { display: inline-flex; }
+            .like-btn .like-icon svg { width: 14px; height: 14px; display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="app-shell">
+
+        <div class="mobile-topbar">
+            <button type="button" class="hamburger-btn" id="hamburger-btn">☰</button>
+            <span class="topbar-brand">Assisto</span>
+        </div>
+
+        <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-brand">Assisto</div>
+            <div class="sidebar-identity" id="app-identity"></div>
+            <nav class="sidebar-nav" id="app-nav"></nav>
+        </div>
+
+        <div class="app-main">
+        <div class="page">
+
+        <div class="search-card">
+            <h1>Suche</h1>
+            <p class="sub">Erst Maschinentyp wählen, dann nach Cause/Remedy/Meldungstext durchsuchen.</p>
+            <div class="search-row">
+                <div>
+                    <label>Maschinentyp</label>
+                    <select id="search-type">
+                        <option value="">Maschinentyp wählen…</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Suchbegriff</label>
+                    <input type="text" id="search-query" placeholder="z.B. Lüfter, Sensor…" disabled />
+                </div>
+            </div>
+        </div>
+
+        <div id="results"></div>
+
+        </div>
+        </div>
+    </div>
+
+    <script src="/assets/auth-client.js"></script>
+    <script src="/assets/sidebar.js"></script>
+    <script>
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    var HEART_PATH = 'M12 20s-7-4.4-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9z';
+    var HEART_OUTLINE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + HEART_PATH + '"/></svg>';
+    var HEART_FILLED = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="' + HEART_PATH + '"/></svg>';
+
+    var VERIFIED_BADGE_SVG =
+        '<svg viewBox="0 0 24 24">' +
+        '<path fill="currentColor" d="M12 1.5l2.4 1.7 2.9-.4 1.1 2.7 2.7 1.1-.4 2.9 1.7 2.4-1.7 2.4.4 2.9-2.7 1.1-1.1 2.7-2.9-.4L12 22.5l-2.4-1.7-2.9.4-1.1-2.7-2.7-1.1.4-2.9L1.6 12l1.7-2.4-.4-2.9 2.7-1.1 1.1-2.7 2.9.4z"/>' +
+        '<path fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" d="M7.8 12.3l2.7 2.7 5.7-6.2"/>' +
+        '</svg>';
+
+    var typeSelect = document.getElementById('search-type');
+    var querySearchInput = document.getElementById('search-query');
+    var resultsEl = document.getElementById('results');
+    var searchDebounce = null;
+
+    // Preselect a type via ?type=... (e.g. linked from a case page's
+    // "search within this machine type" context) once the list has loaded.
+    var initialType = new URLSearchParams(window.location.search).get('type') || '';
+
+    fetch('/api/case?types=1')
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            var types = data.types || [];
+            typeSelect.innerHTML = '<option value="">Maschinentyp wählen…</option>' +
+                types.map(function(t) { return '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>'; }).join('');
+            if (initialType && types.indexOf(initialType) !== -1) {
+                typeSelect.value = initialType;
+                querySearchInput.disabled = false;
+            }
+        });
+
+    typeSelect.addEventListener('change', function() {
+        querySearchInput.disabled = !typeSelect.value;
+        runSearch();
+    });
+
+    querySearchInput.addEventListener('input', function() {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(runSearch, 300);
+    });
+
+    function runSearch() {
+        var type = typeSelect.value;
+        var q = querySearchInput.value.trim();
+
+        if (!type) {
+            resultsEl.innerHTML = '<div class="empty-state">Wähle zuerst einen Maschinentyp.</div>';
+            return;
+        }
+        if (!q) {
+            resultsEl.innerHTML = '<div class="empty-state">Suchbegriff eingeben, um in ' + escapeHtml(type) + ' zu suchen.</div>';
+            return;
+        }
+
+        resultsEl.innerHTML = '<div class="loading">Suche…</div>';
+
+        fetch('/api/case?search=1&type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q))
+            .then(function(resp) {
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.json();
+            })
+            .then(function(data) { renderResults(data.cases || [], q); })
+            .catch(function(err) {
+                resultsEl.innerHTML = '<div class="empty-state">Suche fehlgeschlagen: ' + escapeHtml(err.message) + '</div>';
+            });
+    }
+
+    function buildCaseCardHtml(c) {
+        var storedMessages = Array.isArray(c.messages) ? c.messages.filter(Boolean) : [];
+        var likedBy = Array.isArray(c.likedBy) ? c.likedBy : [];
+        var auth = AssistoAuth.get();
+        var likedByMe = !!(auth && likedBy.indexOf(auth.username) !== -1);
+        return '<div class="case-card good" data-id="' + escapeHtml(c.id) + '">' +
+            '<div class="case-meta">' + escapeHtml(new Date(c.timestamp).toLocaleString()) +
+                (c.technician ? ' &middot; ' + escapeHtml(c.technician) : '') +
+                (c.machineType ? ' &middot; ' + escapeHtml(c.machineType) : '') +
+                (c.verified
+                    ? ' <span class="verified-icon" title="Von Admin geprüft">' + VERIFIED_BADGE_SVG + '</span>'
+                    : '') +
+            '</div>' +
+            (storedMessages.length
+                ? '<div class="case-line" style="margin-bottom:6px;">' + storedMessages.map(escapeHtml).join(' &middot; ') + '</div>'
+                : '') +
+            '<div class="case-line"><span class="case-label">Cause:</span> ' + escapeHtml(c.cause) + '</div>' +
+            '<div class="case-line"><span class="case-label">Remedy:</span> ' + escapeHtml(c.remedy) + '</div>' +
+            '<button type="button" class="like-btn' + (likedByMe ? ' liked' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
+                '<span class="like-icon">' + (likedByMe ? HEART_FILLED : HEART_OUTLINE) + '</span> ' +
+                '<span class="like-count">' + likedBy.length + '</span>' +
+                '<span class="like-word">' + (likedBy.length === 1 ? ' hat geholfen' : ' fanden das hilfreich') + '</span>' +
+            '</button>' +
+        '</div>';
+    }
+
+    function renderResults(cases, q) {
+        if (cases.length === 0) {
+            resultsEl.innerHTML = '<div class="empty-state">Kein Treffer für &bdquo;' + escapeHtml(q) + '&ldquo;.</div>';
+            return;
+        }
+        resultsEl.innerHTML =
+            '<div class="section-heading">' + cases.length + ' Treffer</div>' +
+            cases.map(buildCaseCardHtml).join('');
+        wireLikeButtons();
+    }
+
+    function wireLikeButtons() {
+        document.querySelectorAll('.like-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var auth = AssistoAuth.get();
+                if (!auth || !auth.token) {
+                    window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
+                    return;
+                }
+                var id = btn.getAttribute('data-id');
+                btn.disabled = true;
+                fetch('/api/case', {
+                    method: 'PATCH',
+                    headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ id: id })
+                })
+                    .then(function(resp) {
+                        if (resp.status === 401) {
+                            AssistoAuth.clear();
+                            throw new Error('Session abgelaufen');
+                        }
+                        return resp.json();
+                    })
+                    .then(function(body) {
+                        if (!body.success) throw new Error(body.message || 'Fehlgeschlagen');
+                        btn.classList.toggle('liked', body.liked);
+                        btn.querySelector('.like-icon').innerHTML = body.liked ? HEART_FILLED : HEART_OUTLINE;
+                        btn.querySelector('.like-count').textContent = body.likes;
+                        btn.querySelector('.like-word').textContent = body.likes === 1 ? ' hat geholfen' : ' fanden das hilfreich';
+                    })
+                    .catch(function(err) { alert(err.message); })
+                    .then(function() { btn.disabled = false; });
+            });
+        });
+    }
+
+    resultsEl.innerHTML = '<div class="empty-state">Wähle zuerst einen Maschinentyp.</div>';
+    </script>
+</body>
+</html>

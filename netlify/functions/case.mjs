@@ -94,6 +94,40 @@ async function handleGet(store, url) {
   });
 }
 
+// Distinct machine types seen across all cases - powers the type picker on
+// the search page, so a technician chooses from types that actually have
+// documented cases instead of typing one from memory.
+async function handleTypes(store) {
+  const cases = await loadCases(store);
+  const types = Array.from(new Set(cases.map((c) => c.machineType).filter((t) => t && t !== '---'))).sort();
+  return jsonResponse({ types });
+}
+
+// Free-text search, scoped to one machine type - a fingerprint match only
+// finds a fault you already have the exact Id combination for, which isn't
+// useful if you're trying to recall "was there something about a clogged
+// fan on a WT190" without one. Scoped to a type because the same words
+// ("fan", "sensor") show up across unrelated machine types often enough
+// that an unscoped search would mostly return noise.
+async function handleSearch(store, url) {
+  const type = (url.searchParams.get('type') || '').trim();
+  const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+
+  if (!type) return jsonResponse({ success: false, message: 'type is required' }, 400);
+  if (!q) return jsonResponse({ cases: [] });
+
+  const cases = await loadCases(store);
+  const matches = cases.filter((c) => {
+    if (c.machineType !== type) return false;
+    const haystack = [c.cause, c.remedy, ...(Array.isArray(c.messages) ? c.messages : [])]
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
+  });
+
+  return jsonResponse({ cases: matches.reverse() });
+}
+
 async function handlePost(store, req) {
   const user = await requireUser(req);
   if (!user) return jsonResponse({ success: false, message: 'Login required to share a fix' }, 401);
@@ -302,6 +336,8 @@ export default async (req) => {
     }
     if (url.searchParams.get('all') === '1') return handleGetAll(req, store);
     if (url.searchParams.get('mine') === '1') return handleGetMine(req, store);
+    if (url.searchParams.get('types') === '1') return handleTypes(store);
+    if (url.searchParams.get('search') === '1') return handleSearch(store, url);
     return handleGet(store, url);
   }
   if (req.method === 'POST') return handlePost(store, req);

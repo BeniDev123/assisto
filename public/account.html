@@ -100,6 +100,7 @@
     <script src="/assets/auth-client.js"></script>
     <script src="/assets/sidebar.js"></script>
     <script src="/assets/photo-upload.js"></script>
+    <script src="/assets/lightbox.js"></script>
     <script src="/assets/pwa.js"></script>
     <script>
     function escapeHtml(str) {
@@ -173,6 +174,10 @@
             var id = card.getAttribute('data-id');
             var msgEl = card.querySelector('.message');
             var photosEl = card.querySelector('.photo-thumbs');
+            // Removal is staged here and only actually sent when "Speichern"
+            // is clicked, same as the cause/remedy edits below - clicking x
+            // just marks a photo, it doesn't delete anything yet.
+            var pendingPhotoDeletes = [];
 
             function loadPhotos() {
                 fetch('/api/case-photo?caseId=' + encodeURIComponent(id))
@@ -182,22 +187,34 @@
                         photosEl.innerHTML = photos.map(function(p) {
                             return '<span class="photo-thumb" data-photo-id="' + escapeHtml(p.id) + '">' +
                                 '<img src="/api/case-photo?id=' + encodeURIComponent(p.id) + '" alt="Foto" loading="lazy" />' +
-                                '<button type="button" class="photo-remove" title="Foto löschen">&times;</button>' +
+                                '<button type="button" class="photo-remove" title="Foto entfernen">&times;</button>' +
                             '</span>';
                         }).join('');
+
+                        photosEl.querySelectorAll('.photo-thumb img').forEach(function(img) {
+                            img.addEventListener('click', function() { openLightbox(img.src); });
+                        });
+
                         photosEl.querySelectorAll('.photo-remove').forEach(function(btn) {
                             btn.addEventListener('click', function() {
-                                var photoId = btn.parentElement.getAttribute('data-photo-id');
-                                fetch('/api/case-photo?id=' + encodeURIComponent(photoId), {
-                                    method: 'DELETE',
-                                    headers: AssistoAuth.headers()
-                                })
-                                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
-                                    .then(function(r) {
-                                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
-                                        loadPhotos();
-                                    })
-                                    .catch(function(err) { alert(err.message); });
+                                var thumb = btn.parentElement;
+                                var photoId = thumb.getAttribute('data-photo-id');
+                                var idx = pendingPhotoDeletes.indexOf(photoId);
+                                if (idx === -1) {
+                                    pendingPhotoDeletes.push(photoId);
+                                    thumb.classList.add('pending-remove');
+                                    btn.innerHTML = '&#8635;';
+                                    btn.title = 'Entfernen rückgängig machen';
+                                } else {
+                                    pendingPhotoDeletes.splice(idx, 1);
+                                    thumb.classList.remove('pending-remove');
+                                    btn.innerHTML = '&times;';
+                                    btn.title = 'Foto entfernen';
+                                }
+                                msgEl.textContent = pendingPhotoDeletes.length === 0 ? '' :
+                                    pendingPhotoDeletes.length === 1 ? '1 Foto wird beim Speichern entfernt.' :
+                                    pendingPhotoDeletes.length + ' Fotos werden beim Speichern entfernt.';
+                                msgEl.className = 'message';
                             });
                         });
                     })
@@ -243,16 +260,28 @@
             card.querySelector('.save-btn').addEventListener('click', function() {
                 var cause = card.querySelector('.edit-cause').value.trim();
                 var remedy = card.querySelector('.edit-remedy').value.trim();
-                fetch('/api/case', {
-                    method: 'PUT',
-                    headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
-                    body: JSON.stringify({ id: id, cause: cause, remedy: remedy })
-                })
+                var deletions = pendingPhotoDeletes.slice();
+
+                Promise.all(deletions.map(function(photoId) {
+                    return fetch('/api/case-photo?id=' + encodeURIComponent(photoId), {
+                        method: 'DELETE',
+                        headers: AssistoAuth.headers()
+                    });
+                }))
+                    .then(function() {
+                        pendingPhotoDeletes = [];
+                        return fetch('/api/case', {
+                            method: 'PUT',
+                            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                            body: JSON.stringify({ id: id, cause: cause, remedy: remedy })
+                        });
+                    })
                     .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
                     .then(function(r) {
                         if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Speichern fehlgeschlagen');
                         msgEl.textContent = 'Gespeichert.';
                         msgEl.className = 'message success';
+                        if (deletions.length > 0) loadPhotos();
                     })
                     .catch(function(err) {
                         msgEl.textContent = err.message;

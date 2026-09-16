@@ -281,6 +281,7 @@
     <script src="/assets/auth-client.js"></script>
     <script src="/assets/sidebar.js"></script>
     <script src="/assets/photo-upload.js"></script>
+    <script src="/assets/lightbox.js"></script>
     <script src="/assets/pwa.js"></script>
     <script>
     function escapeHtml(str) {
@@ -408,10 +409,13 @@
                 .then(function(data) {
                     var photos = data.photos || [];
                     container.innerHTML = photos.map(function(p) {
-                        return '<a class="photo-thumb" href="/api/case-photo?id=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">' +
+                        return '<span class="photo-thumb">' +
                             '<img src="/api/case-photo?id=' + encodeURIComponent(p.id) + '" alt="Foto" loading="lazy" />' +
-                        '</a>';
+                        '</span>';
                     }).join('');
+                    container.querySelectorAll('img').forEach(function(img) {
+                        img.addEventListener('click', function() { openLightbox(img.src); });
+                    });
                 })
                 .catch(function() { /* thumbnails are a nice-to-have, fail silently */ });
         });
@@ -475,6 +479,10 @@
                 '<button type="button" class="photo-remove" title="Entfernen">&times;</button>' +
             '</span>';
         }).join('');
+
+        previewEl.querySelectorAll('img').forEach(function(img) {
+            img.addEventListener('click', function() { openLightbox(img.src); });
+        });
 
         previewEl.querySelectorAll('.photo-remove').forEach(function(btn) {
             btn.addEventListener('click', function() {

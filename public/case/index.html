@@ -152,53 +152,26 @@
             .like-btn .like-icon svg { width: 14px; height: 14px; display: block; }
 
         /* Connects multiple documented fixes for the exact same combination
-           into one history instead of a stack of look-alike cards. Newest
-           first is just reading order, not a ranking - a later write-up
-           isn't more correct than an earlier one, so every entry gets the
-           same weight; the like count is the real signal of what helped. */
-        .case-timeline {
-            position: relative;
-            padding-left: 24px;
-            margin-bottom: 10px;
-        }
-
-            .case-timeline::before {
-                content: '';
-                position: absolute;
-                left: 9px;
-                top: 6px;
-                bottom: 6px;
-                width: 2px;
-                background: var(--success);
-            }
-
-        .case-timeline-entry {
-            position: relative;
-            margin-bottom: 10px;
-        }
-
-            .case-timeline-entry:last-child {
-                margin-bottom: 0;
-            }
-
-            .case-timeline-entry .case-card {
-                margin-bottom: 0;
-            }
-
-        .case-timeline-dot {
-            position: absolute;
-            left: -24px;
-            top: 2px;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: var(--panel);
-            border: 2px solid var(--success);
+           into one group instead of a stack of look-alike cards - each
+           card's own left border extends the results-block's accent
+           stripe directly (flush, no gap or separate connector line), so
+           it reads as one continuous green edge with cards hanging off it
+           rather than two parallel green elements. Newest first is just
+           reading order, not a ranking - a later write-up isn't more
+           correct than an earlier one, so every entry gets the same
+           weight; the like count is the real signal of what helped. */
+        .case-stack {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--success);
-            font-size: 10px;
+            flex-direction: column;
+            gap: 2px;
+            margin: 0 0 10px -14px;
+        }
+
+        .case-stack .case-card {
+            border-left: 4px solid var(--success);
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 0;
+            padding-left: 10px;
         }
 
         .other-type-note {
@@ -416,9 +389,8 @@
             if (data.exactSameType.length > 0) {
                 html += '<div class="section-heading good">&#10003; Known on this machine type</div>';
                 if (data.exactSameType.length > 1) {
-                    html += '<div class="case-timeline">' + data.exactSameType.map(function(c) {
-                        return '<div class="case-timeline-entry"><span class="case-timeline-dot">&#10003;</span>' +
-                            buildCaseCardHtml(c, 'good') + '</div>';
+                    html += '<div class="case-stack">' + data.exactSameType.map(function(c) {
+                        return buildCaseCardHtml(c, 'good');
                     }).join('') + '</div>';
                 } else {
                     html += buildCaseCardHtml(data.exactSameType[0], 'good');

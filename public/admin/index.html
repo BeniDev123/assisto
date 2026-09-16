@@ -224,6 +224,10 @@
 
             <section class="panel" id="panel-users" hidden>
                 <h1>Benutzer</h1>
+                <section class="panel-card" id="reset-requests-card" hidden>
+                    <h2>Offene Passwort-Anfragen</h2>
+                    <div id="reset-requests-list"></div>
+                </section>
                 <section class="panel-card">
                     <h2>Alle Benutzer</h2>
                     <div id="users-list"><div class="loading">Lade…</div></div>
@@ -304,6 +308,7 @@
         if (access) {
             loadUsers();
             loadCases();
+            loadResetRequests();
         }
     }
 
@@ -343,6 +348,77 @@
         var section = new URL(href, window.location.origin).searchParams.get('section') || 'overview';
         showSection(section);
     };
+
+    function loadResetRequests() {
+        fetch('/api/password-reset', { headers: AssistoAuth.adminHeaders() })
+            .then(function(resp) {
+                if (resp.status === 401) { logout(); throw new Error('Zugang abgelaufen'); }
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.json();
+            })
+            .then(function(data) { renderResetRequests(data.requests || []); })
+            .catch(function() {
+                document.getElementById('reset-requests-card').hidden = true;
+            });
+    }
+
+    function renderResetRequests(requests) {
+        var card = document.getElementById('reset-requests-card');
+        var list = document.getElementById('reset-requests-list');
+        card.hidden = requests.length === 0;
+        if (requests.length === 0) return;
+
+        list.innerHTML = requests.map(function(r) {
+            var username = escapeHtml(r.username);
+            return '<div class="user-card" data-username="' + username + '">' +
+                '<div class="row" style="border-bottom:none; padding-bottom:0;">' +
+                    '<div class="row-main">' + username +
+                        '<div class="row-role">' + (r.role === 'admin' ? 'Admin' : 'Techniker') + ' &middot; ' + escapeHtml(new Date(r.requestedAt).toLocaleString()) + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex; gap:8px;">' +
+                        '<button type="button" class="primary reset-generate-btn">Neues Passwort generieren</button>' +
+                        '<button type="button" class="link reset-dismiss-btn">Verwerfen</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="message reset-result"></div>' +
+            '</div>';
+        }).join('');
+
+        list.querySelectorAll('.user-card').forEach(function(row) {
+            var username = row.getAttribute('data-username');
+            var resultEl = row.querySelector('.reset-result');
+
+            row.querySelector('.reset-generate-btn').addEventListener('click', function() {
+                fetch('/api/password-reset', {
+                    method: 'PATCH',
+                    headers: AssistoAuth.adminHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ username: username })
+                })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Fehlgeschlagen');
+                        resultEl.textContent = 'Neues Passwort für ' + username + ': ' + r.body.password + ' (jetzt weitergeben, wird nicht nochmal angezeigt)';
+                        resultEl.className = 'message reset-result success';
+                        row.querySelector('.reset-generate-btn').disabled = true;
+                        row.querySelector('.reset-dismiss-btn').remove();
+                        loadUsers();
+                    })
+                    .catch(function(err) {
+                        resultEl.textContent = err.message;
+                        resultEl.className = 'message reset-result error';
+                    });
+            });
+
+            row.querySelector('.reset-dismiss-btn').addEventListener('click', function() {
+                fetch('/api/password-reset?username=' + encodeURIComponent(username), {
+                    method: 'DELETE',
+                    headers: AssistoAuth.adminHeaders()
+                })
+                    .then(function() { loadResetRequests(); })
+                    .catch(function(err) { alert(err.message); });
+            });
+        });
+    }
 
     function loadUsers() {
         fetch('/api/users', { headers: AssistoAuth.adminHeaders() })
@@ -605,6 +681,7 @@
                 '<textarea rows="2" class="edit-cause">' + escapeHtml(c.cause) + '</textarea>' +
                 '<label>Remedy</label>' +
                 '<textarea rows="2" class="edit-remedy">' + escapeHtml(c.remedy) + '</textarea>' +
+                '<div class="photo-thumbs" data-photos-for="' + escapeHtml(c.id) + '"></div>' +
                 '<div class="case-actions">' +
                     '<button type="button" class="primary save-btn">Speichern</button>' +
                     '<button type="button" class="verify-btn">' + (c.verified ? 'Verifizierung aufheben' : 'Verifizieren') + '</button>' +
@@ -617,6 +694,38 @@
         el.querySelectorAll('.case-card').forEach(function(card) {
             var id = card.getAttribute('data-id');
             var msgEl = card.querySelector('.message');
+            var photosEl = card.querySelector('.photo-thumbs');
+
+            function loadPhotos() {
+                fetch('/api/case-photo?caseId=' + encodeURIComponent(id))
+                    .then(function(resp) { return resp.json(); })
+                    .then(function(data) {
+                        var photos = data.photos || [];
+                        photosEl.innerHTML = photos.map(function(p) {
+                            return '<span class="photo-thumb" data-photo-id="' + escapeHtml(p.id) + '">' +
+                                '<img src="/api/case-photo?id=' + encodeURIComponent(p.id) + '" alt="Foto" loading="lazy" />' +
+                                '<button type="button" class="photo-remove" title="Foto löschen">&times;</button>' +
+                            '</span>';
+                        }).join('');
+                        photosEl.querySelectorAll('.photo-remove').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                                var photoId = btn.parentElement.getAttribute('data-photo-id');
+                                fetch('/api/case-photo?id=' + encodeURIComponent(photoId), {
+                                    method: 'DELETE',
+                                    headers: AssistoAuth.adminHeaders()
+                                })
+                                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                                    .then(function(r) {
+                                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
+                                        loadPhotos();
+                                    })
+                                    .catch(function(err) { alert(err.message); });
+                            });
+                        });
+                    })
+                    .catch(function() { /* thumbnails are a nice-to-have, fail silently */ });
+            }
+            loadPhotos();
 
             card.querySelector('.save-btn').addEventListener('click', function() {
                 var cause = card.querySelector('.edit-cause').value.trim();

@@ -1,3 +1,4 @@
+import { getStore } from '@netlify/blobs';
 import { sql } from './lib/db.mjs';
 import { requireUser, requireAdmin } from './lib/auth.mjs';
 
@@ -353,6 +354,14 @@ async function handleDelete(req, url) {
 
   const actor = await requireAdminOrOwner(req, entry);
   if (!actor) return jsonResponse({ success: false, message: 'Not authorized to delete this case' }, 403);
+
+  // The DB row cascades away with the case, but the image bytes in Blobs
+  // don't - clean those up explicitly or they'd sit there orphaned forever.
+  const photoRows = await sql()`SELECT id FROM case_photos WHERE case_id = ${id}`;
+  if (photoRows.length > 0) {
+    const store = getStore('case-photos');
+    await Promise.all(photoRows.map((p) => store.delete(p.id)));
+  }
 
   await sql()`DELETE FROM cases WHERE id = ${id}`;
   return jsonResponse({ success: true });

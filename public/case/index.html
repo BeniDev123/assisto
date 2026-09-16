@@ -253,6 +253,8 @@
                     <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
                     <label>Remedy</label>
                     <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
+                    <label>Foto (optional)</label>
+                    <input type="file" id="form-photo" accept="image/*" capture="environment" />
                     <button type="submit" class="primary" id="form-submit">Submit</button>
                     <div class="message form-message" id="form-message"></div>
                 </form>
@@ -273,6 +275,7 @@
 
     <script src="/assets/auth-client.js"></script>
     <script src="/assets/sidebar.js"></script>
+    <script src="/assets/photo-upload.js"></script>
     <script src="/assets/pwa.js"></script>
     <script>
     function escapeHtml(str) {
@@ -351,6 +354,7 @@
                 : '') +
             '<div class="case-line"><span class="case-label">Cause:</span> ' + escapeHtml(c.cause) + '</div>' +
             '<div class="case-line"><span class="case-label">Remedy:</span> ' + escapeHtml(c.remedy) + '</div>' +
+            '<div class="photo-thumbs" data-photos-for="' + escapeHtml(c.id) + '"></div>' +
             '<button type="button" class="like-btn' + (likedByMe ? ' liked' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
                 '<span class="like-icon">' + (likedByMe ? HEART_FILLED : HEART_OUTLINE) + '</span> ' +
                 '<span class="like-count">' + likedBy.length + '</span>' +
@@ -388,6 +392,24 @@
 
         el.innerHTML = html;
         wireLikeButtons();
+        loadPhotosForCards();
+    }
+
+    function loadPhotosForCards() {
+        document.querySelectorAll('.photo-thumbs[data-photos-for]').forEach(function(container) {
+            var caseId = container.getAttribute('data-photos-for');
+            fetch('/api/case-photo?caseId=' + encodeURIComponent(caseId))
+                .then(function(resp) { return resp.json(); })
+                .then(function(data) {
+                    var photos = data.photos || [];
+                    container.innerHTML = photos.map(function(p) {
+                        return '<a class="photo-thumb" href="/api/case-photo?id=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">' +
+                            '<img src="/api/case-photo?id=' + encodeURIComponent(p.id) + '" alt="Foto" loading="lazy" />' +
+                        '</a>';
+                    }).join('');
+                })
+                .catch(function() { /* thumbnails are a nice-to-have, fail silently */ });
+        });
     }
 
     function wireLikeButtons() {
@@ -461,6 +483,9 @@
         messageEl.textContent = '';
         messageEl.className = 'message form-message';
 
+        var photoInput = document.getElementById('form-photo');
+        var photoFile = photoInput.files && photoInput.files[0];
+
         fetch('/api/case', {
             method: 'POST',
             headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
@@ -481,11 +506,25 @@
                 if (!resp.ok) return resp.json().then(function(body) { throw new Error(body.message || ('HTTP ' + resp.status)); });
                 return resp.json();
             })
+            .then(function(result) {
+                if (!photoFile) return result;
+                return compressPhotoToBase64(photoFile)
+                    .then(function(photo) {
+                        return fetch('/api/case-photo', {
+                            method: 'POST',
+                            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                            body: JSON.stringify({ caseId: result.entry.id, contentType: photo.contentType, dataBase64: photo.dataBase64 })
+                        });
+                    })
+                    .catch(function() { /* the case itself saved fine either way */ })
+                    .then(function() { return result; });
+            })
             .then(function() {
                 messageEl.textContent = 'Thanks — shared with everyone who scans this fault.';
                 messageEl.className = 'message form-message success';
                 document.getElementById('form-cause').value = '';
                 document.getElementById('form-remedy').value = '';
+                photoInput.value = '';
                 return fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType));
             })
             .then(function(resp) { return resp.json(); })

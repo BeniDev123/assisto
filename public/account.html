@@ -99,6 +99,7 @@
 
     <script src="/assets/auth-client.js"></script>
     <script src="/assets/sidebar.js"></script>
+    <script src="/assets/photo-upload.js"></script>
     <script src="/assets/pwa.js"></script>
     <script>
     function escapeHtml(str) {
@@ -151,6 +152,11 @@
                 '<textarea rows="2" class="edit-cause">' + escapeHtml(c.cause) + '</textarea>' +
                 '<label>Remedy</label>' +
                 '<textarea rows="2" class="edit-remedy">' + escapeHtml(c.remedy) + '</textarea>' +
+                '<div class="photo-thumbs" data-photos-for="' + escapeHtml(c.id) + '"></div>' +
+                '<div style="margin-top:8px;">' +
+                    '<label>Foto hinzufügen</label>' +
+                    '<input type="file" class="photo-input" accept="image/*" capture="environment" />' +
+                '</div>' +
                 '<div class="case-actions">' +
                     '<button type="button" class="primary save-btn">Speichern</button>' +
                     '<button type="button" class="danger delete-btn">Löschen</button>' +
@@ -162,6 +168,63 @@
         el.querySelectorAll('.case-card').forEach(function(card) {
             var id = card.getAttribute('data-id');
             var msgEl = card.querySelector('.message');
+            var photosEl = card.querySelector('.photo-thumbs');
+
+            function loadPhotos() {
+                fetch('/api/case-photo?caseId=' + encodeURIComponent(id))
+                    .then(function(resp) { return resp.json(); })
+                    .then(function(data) {
+                        var photos = data.photos || [];
+                        photosEl.innerHTML = photos.map(function(p) {
+                            return '<span class="photo-thumb" data-photo-id="' + escapeHtml(p.id) + '">' +
+                                '<img src="/api/case-photo?id=' + encodeURIComponent(p.id) + '" alt="Foto" loading="lazy" />' +
+                                '<button type="button" class="photo-remove" title="Foto löschen">&times;</button>' +
+                            '</span>';
+                        }).join('');
+                        photosEl.querySelectorAll('.photo-remove').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                                var photoId = btn.parentElement.getAttribute('data-photo-id');
+                                fetch('/api/case-photo?id=' + encodeURIComponent(photoId), {
+                                    method: 'DELETE',
+                                    headers: AssistoAuth.headers()
+                                })
+                                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                                    .then(function(r) {
+                                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Löschen fehlgeschlagen');
+                                        loadPhotos();
+                                    })
+                                    .catch(function(err) { alert(err.message); });
+                            });
+                        });
+                    })
+                    .catch(function() { /* thumbnails are a nice-to-have, fail silently */ });
+            }
+            loadPhotos();
+
+            card.querySelector('.photo-input').addEventListener('change', function() {
+                var file = this.files && this.files[0];
+                if (!file) return;
+                var input = this;
+                input.disabled = true;
+                compressPhotoToBase64(file)
+                    .then(function(photo) {
+                        return fetch('/api/case-photo', {
+                            method: 'POST',
+                            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                            body: JSON.stringify({ caseId: id, contentType: photo.contentType, dataBase64: photo.dataBase64 })
+                        });
+                    })
+                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                    .then(function(r) {
+                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Hochladen fehlgeschlagen');
+                        loadPhotos();
+                    })
+                    .catch(function(err) { alert(err.message); })
+                    .then(function() {
+                        input.disabled = false;
+                        input.value = '';
+                    });
+            });
 
             card.querySelector('.save-btn').addEventListener('click', function() {
                 var cause = card.querySelector('.edit-cause').value.trim();

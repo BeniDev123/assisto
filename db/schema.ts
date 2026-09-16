@@ -28,9 +28,28 @@ export const cases = pgTable('cases', {
   index('cases_technician_idx').on(table.technician),
 ])
 
+// The image bytes themselves live in Netlify Blobs, keyed by id - this row
+// is just the metadata needed to list/authorize/render them.
+export const casePhotos = pgTable('case_photos', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  contentType: text('content_type').notNull(),
+  uploadedBy: text('uploaded_by').notNull(),
+  uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('case_photos_case_id_idx').on(table.caseId),
+])
+
 export const caseLikes = pgTable('case_likes', {
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   username: text('username').notNull(),
 }, (table) => [
   primaryKey({ columns: [table.caseId, table.username] }),
 ])
+
+// One open request per username - a repeat request just refreshes
+// requested_at (ON CONFLICT DO UPDATE) instead of stacking up duplicates.
+export const passwordResetRequests = pgTable('password_reset_requests', {
+  username: text('username').primaryKey(),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+})

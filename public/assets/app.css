@@ -100,6 +100,50 @@ button.link {
 
     button.link:hover { color: var(--accent-hover); }
 
+.photo-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.photo-thumb {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--field);
+    display: block;
+}
+
+    .photo-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .photo-thumb .photo-remove {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 18px;
+        height: 18px;
+        line-height: 16px;
+        text-align: center;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.65);
+        color: #fff;
+        font-size: 12px;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+    }
+
+        .photo-thumb .photo-remove:hover { background: var(--danger); }
+
 .card {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 }

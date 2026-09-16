@@ -253,12 +253,13 @@
                     <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
                     <label>Remedy</label>
                     <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
-                    <label>Foto (optional)</label>
+                    <label>Fotos (optional, mehrere möglich)</label>
                     <label class="file-picker">
-                        <input type="file" id="form-photo" accept="image/*" class="file-input-hidden" />
-                        <span class="file-picker-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>Foto auswählen</span>
-                        <span class="file-picker-name" id="form-photo-name">Kein Foto ausgewählt</span>
+                        <input type="file" id="form-photo" accept="image/*" multiple class="file-input-hidden" />
+                        <span class="file-picker-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>Fotos auswählen</span>
+                        <span class="file-picker-name" id="form-photo-name">Keine Fotos ausgewählt</span>
                     </label>
+                    <div class="photo-thumbs" id="form-photo-preview"></div>
                     <button type="submit" class="primary" id="form-submit">Submit</button>
                     <div class="message form-message" id="form-message"></div>
                 </form>
@@ -452,9 +453,46 @@
         });
     }
 
+    // Mirrors MAX_PHOTOS_PER_CASE in netlify/functions/case-photo.mjs.
+    var MAX_PHOTOS_PER_CASE = 4;
+    var selectedPhotoFiles = [];
+
+    function renderPhotoPreview() {
+        var nameEl = document.getElementById('form-photo-name');
+        var previewEl = document.getElementById('form-photo-preview');
+
+        nameEl.textContent = selectedPhotoFiles.length === 0
+            ? 'Keine Fotos ausgewählt'
+            : selectedPhotoFiles.length + (selectedPhotoFiles.length === 1 ? ' Foto ausgewählt' : ' Fotos ausgewählt');
+
+        // These are exactly the thumbnails a submitted case shows, built
+        // from local object URLs - so this preview is the real thing, not
+        // an approximation of it.
+        previewEl.querySelectorAll('img').forEach(function(img) { URL.revokeObjectURL(img.src); });
+        previewEl.innerHTML = selectedPhotoFiles.map(function(file, i) {
+            return '<span class="photo-thumb" data-index="' + i + '">' +
+                '<img src="' + URL.createObjectURL(file) + '" alt="Vorschau" />' +
+                '<button type="button" class="photo-remove" title="Entfernen">&times;</button>' +
+            '</span>';
+        }).join('');
+
+        previewEl.querySelectorAll('.photo-remove').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var idx = Number(btn.parentElement.getAttribute('data-index'));
+                selectedPhotoFiles.splice(idx, 1);
+                renderPhotoPreview();
+            });
+        });
+    }
+
     document.getElementById('form-photo').addEventListener('change', function() {
-        var file = this.files && this.files[0];
-        document.getElementById('form-photo-name').textContent = file ? file.name : 'Kein Foto ausgewählt';
+        var files = Array.prototype.slice.call(this.files || []);
+        if (files.length > MAX_PHOTOS_PER_CASE) {
+            alert('Maximal ' + MAX_PHOTOS_PER_CASE + ' Fotos pro Fall - die ersten ' + MAX_PHOTOS_PER_CASE + ' werden verwendet.');
+            files = files.slice(0, MAX_PHOTOS_PER_CASE);
+        }
+        selectedPhotoFiles = files;
+        renderPhotoPreview();
     });
 
     fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType))
@@ -493,7 +531,7 @@
         messageEl.className = 'message form-message';
 
         var photoInput = document.getElementById('form-photo');
-        var photoFile = photoInput.files && photoInput.files[0];
+        var photoFiles = selectedPhotoFiles.slice();
 
         fetch('/api/case', {
             method: 'POST',
@@ -516,15 +554,20 @@
                 return resp.json();
             })
             .then(function(result) {
-                if (!photoFile) return result;
-                return compressPhotoToBase64(photoFile)
-                    .then(function(photo) {
-                        return fetch('/api/case-photo', {
-                            method: 'POST',
-                            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
-                            body: JSON.stringify({ caseId: result.entry.id, contentType: photo.contentType, dataBase64: photo.dataBase64 })
+                if (photoFiles.length === 0) return result;
+                // Uploaded one at a time (not Promise.all) so they can't
+                // race past MAX_PHOTOS_PER_CASE on the server.
+                return photoFiles.reduce(function(chain, file) {
+                    return chain.then(function() {
+                        return compressPhotoToBase64(file).then(function(photo) {
+                            return fetch('/api/case-photo', {
+                                method: 'POST',
+                                headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                                body: JSON.stringify({ caseId: result.entry.id, contentType: photo.contentType, dataBase64: photo.dataBase64 })
+                            });
                         });
-                    })
+                    });
+                }, Promise.resolve())
                     .catch(function() { /* the case itself saved fine either way */ })
                     .then(function() { return result; });
             })
@@ -534,7 +577,8 @@
                 document.getElementById('form-cause').value = '';
                 document.getElementById('form-remedy').value = '';
                 photoInput.value = '';
-                document.getElementById('form-photo-name').textContent = 'Kein Foto ausgewählt';
+                selectedPhotoFiles = [];
+                renderPhotoPreview();
                 return fetch('/api/case?fp=' + encodeURIComponent(fp) + '&type=' + encodeURIComponent(machineType));
             })
             .then(function(resp) { return resp.json(); })

@@ -154,11 +154,11 @@
                 '<textarea rows="2" class="edit-remedy">' + escapeHtml(c.remedy) + '</textarea>' +
                 '<div class="photo-thumbs" data-photos-for="' + escapeHtml(c.id) + '"></div>' +
                 '<div style="margin-top:8px;">' +
-                    '<label>Foto hinzufügen</label>' +
+                    '<label>Fotos hinzufügen</label>' +
                     '<label class="file-picker">' +
-                        '<input type="file" class="photo-input file-input-hidden" accept="image/*" />' +
-                        '<span class="file-picker-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>Foto auswählen</span>' +
-                        '<span class="file-picker-name">Kein Foto ausgewählt</span>' +
+                        '<input type="file" class="photo-input file-input-hidden" accept="image/*" multiple />' +
+                        '<span class="file-picker-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>Fotos auswählen</span>' +
+                        '<span class="file-picker-name">Keine Fotos ausgewählt</span>' +
                     '</label>' +
                 '</div>' +
                 '<div class="case-actions">' +
@@ -206,30 +206,37 @@
             loadPhotos();
 
             card.querySelector('.photo-input').addEventListener('change', function() {
-                var file = this.files && this.files[0];
-                if (!file) return;
+                var files = Array.prototype.slice.call(this.files || []);
+                if (files.length === 0) return;
                 var input = this;
                 var nameEl = input.parentElement.querySelector('.file-picker-name');
                 input.disabled = true;
-                if (nameEl) nameEl.textContent = file.name;
-                compressPhotoToBase64(file)
-                    .then(function(photo) {
-                        return fetch('/api/case-photo', {
-                            method: 'POST',
-                            headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
-                            body: JSON.stringify({ caseId: id, contentType: photo.contentType, dataBase64: photo.dataBase64 })
-                        });
-                    })
-                    .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
-                    .then(function(r) {
-                        if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Hochladen fehlgeschlagen');
-                        loadPhotos();
-                    })
-                    .catch(function(err) { alert(err.message); })
+                if (nameEl) nameEl.textContent = files.length === 1 ? files[0].name : files.length + ' Fotos werden hochgeladen…';
+
+                // One at a time (not Promise.all) so uploads can't race past
+                // the server's per-case photo limit.
+                files.reduce(function(chain, file) {
+                    return chain.then(function() {
+                        return compressPhotoToBase64(file)
+                            .then(function(photo) {
+                                return fetch('/api/case-photo', {
+                                    method: 'POST',
+                                    headers: AssistoAuth.headers({ 'Content-Type': 'application/json' }),
+                                    body: JSON.stringify({ caseId: id, contentType: photo.contentType, dataBase64: photo.dataBase64 })
+                                });
+                            })
+                            .then(function(resp) { return resp.json().then(function(b) { return { ok: resp.ok, body: b }; }); })
+                            .then(function(r) {
+                                if (!r.ok || !r.body.success) throw new Error(r.body.message || 'Hochladen fehlgeschlagen');
+                            });
+                    });
+                }, Promise.resolve())
+                    .then(function() { loadPhotos(); })
+                    .catch(function(err) { alert(err.message); loadPhotos(); })
                     .then(function() {
                         input.disabled = false;
                         input.value = '';
-                        if (nameEl) nameEl.textContent = 'Kein Foto ausgewählt';
+                        if (nameEl) nameEl.textContent = 'Keine Fotos ausgewählt';
                     });
             });
 

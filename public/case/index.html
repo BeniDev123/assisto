@@ -151,29 +151,6 @@
             .like-btn .like-icon { display: inline-flex; }
             .like-btn .like-icon svg { width: 14px; height: 14px; display: block; }
 
-        /* Connects multiple documented fixes for the exact same combination
-           into one group instead of a stack of look-alike cards - each
-           card's own left border extends the results-block's accent
-           stripe directly (flush, no gap or separate connector line), so
-           it reads as one continuous green edge with cards hanging off it
-           rather than two parallel green elements. Newest first is just
-           reading order, not a ranking - a later write-up isn't more
-           correct than an earlier one, so every entry gets the same
-           weight; the like count is the real signal of what helped. */
-        .case-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            margin: 0 0 10px -14px;
-        }
-
-        .case-stack .case-card {
-            border-left: 4px solid var(--success);
-            border-radius: 0 10px 10px 0;
-            margin-bottom: 0;
-            padding-left: 10px;
-        }
-
         .other-type-note {
             font-size: 12px;
             color: var(--soft);
@@ -388,13 +365,7 @@
         } else {
             if (data.exactSameType.length > 0) {
                 html += '<div class="section-heading good">&#10003; Known on this machine type</div>';
-                if (data.exactSameType.length > 1) {
-                    html += '<div class="case-stack">' + data.exactSameType.map(function(c) {
-                        return buildCaseCardHtml(c, 'good');
-                    }).join('') + '</div>';
-                } else {
-                    html += buildCaseCardHtml(data.exactSameType[0], 'good');
-                }
+                html += data.exactSameType.map(function(c) { return buildCaseCardHtml(c, 'good'); }).join('');
             }
             if (data.exactOtherType.length > 0) {
                 html += '<div class="section-heading other">&#9432; Seen on other machine types &ndash; cause may not apply here</div>';

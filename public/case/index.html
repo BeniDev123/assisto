@@ -10,12 +10,35 @@
             max-width: 480px;
         }
 
+        /* One continuous card for the whole flow (fault -> what's known ->
+           share a fix) instead of separately bordered/colored boxes that
+           read as unrelated - it's all one flow, so it should look like it.
+           Color now lives as a left accent stripe per section rather than
+           a full box outline. */
+        .page-flow {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 18px;
+        }
+
         .context-card {
             background: var(--panel);
-            border: 1px solid var(--danger);
-            border-radius: 10px;
+            border-left: 4px solid var(--danger);
             padding: 12px 14px;
-            margin-bottom: 18px;
+        }
+
+        .results-block {
+            background: var(--panel);
+            border-top: 1px solid var(--line);
+            padding: 14px;
+        }
+
+        .share-block {
+            background: var(--panel);
+            border-top: 1px solid var(--line);
+            border-left: 4px solid var(--accent);
+            padding: 14px;
         }
 
         .context-label {
@@ -55,6 +78,10 @@
             font-weight: 600;
             margin: 18px 0 10px 0;
         }
+
+            .section-heading:first-child {
+                margin-top: 0;
+            }
 
         .section-heading.good { color: var(--success); }
         .section-heading.other { color: var(--warning); }
@@ -183,14 +210,6 @@
             margin-bottom: 10px;
         }
 
-        form {
-            background: var(--panel);
-            border: 1px solid var(--accent);
-            border-radius: 10px;
-            padding: 16px;
-            margin-top: 22px;
-        }
-
         form h2 {
             font-size: 15px;
             margin: 0 0 12px 0;
@@ -213,11 +232,6 @@
 
         .login-prompt {
             text-align: center;
-            background: var(--panel);
-            border: 1px solid var(--accent);
-            border-radius: 10px;
-            padding: 18px 16px;
-            margin-top: 22px;
         }
 
             .login-prompt p {
@@ -262,29 +276,37 @@
         <div class="app-main">
         <div class="page">
 
-        <div class="context-card">
-            <div class="context-label">This fault combination</div>
-            <div class="context-ids" id="context-ids"></div>
-            <div class="context-type" id="context-type"></div>
-        </div>
+        <div class="page-flow">
 
-        <div id="results">
-            <div class="loading">Looking up known cases…</div>
-        </div>
+            <div class="context-card">
+                <div class="context-label">This fault combination</div>
+                <div class="context-ids" id="context-ids"></div>
+                <div class="context-type" id="context-type"></div>
+            </div>
 
-        <form id="submit-form" hidden>
-            <h2>Know the fix? Share it.</h2>
-            <label>Cause</label>
-            <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
-            <label>Remedy</label>
-            <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
-            <button type="submit" class="primary" id="form-submit">Submit</button>
-            <div class="message form-message" id="form-message"></div>
-        </form>
+            <div class="results-block">
+                <div id="results">
+                    <div class="loading">Looking up known cases…</div>
+                </div>
+            </div>
 
-        <div class="login-prompt" id="login-prompt" hidden>
-            <p>Kennst du die Lösung? Melde dich an, um sie zu teilen.</p>
-            <a class="button" id="login-link" href="/login.html">Anmelden</a>
+            <div class="share-block">
+                <form id="submit-form" hidden>
+                    <h2>Know the fix? Share it.</h2>
+                    <label>Cause</label>
+                    <textarea id="form-cause" rows="2" placeholder="e.g. cabinet fan clogged"></textarea>
+                    <label>Remedy</label>
+                    <textarea id="form-remedy" rows="2" placeholder="e.g. cleaned fan, replaced filter"></textarea>
+                    <button type="submit" class="primary" id="form-submit">Submit</button>
+                    <div class="message form-message" id="form-message"></div>
+                </form>
+
+                <div class="login-prompt" id="login-prompt" hidden>
+                    <p>Kennst du die Lösung? Melde dich an, um sie zu teilen.</p>
+                    <a class="button" id="login-link" href="/login.html">Anmelden</a>
+                </div>
+            </div>
+
         </div>
 
         <div class="offline-note">This page needs a connection on your phone &mdash; the machine itself works fully offline.</div>

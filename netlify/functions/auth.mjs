@@ -1,5 +1,5 @@
 import { verifyPassword, signToken } from './lib/auth.mjs';
-import { loadUsers } from './lib/users-store.mjs';
+import { getUserByUsername } from './lib/users-store.mjs';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -24,8 +24,7 @@ export default async (req) => {
     return jsonResponse({ success: false, message: 'username and password are required' }, 400);
   }
 
-  const users = await loadUsers();
-  const user = users.find((u) => u.username === username);
+  const user = await getUserByUsername(username);
   if (!user || !(await verifyPassword(password, user.salt, user.hash))) {
     return jsonResponse({ success: false, message: 'Invalid username or password' }, 401);
   }

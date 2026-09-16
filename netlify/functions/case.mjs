@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+import { sql } from './lib/db.mjs';
 import { requireUser, requireAdmin } from './lib/auth.mjs';
 
 // Same matching approach as ControlCenter's local logs.html: a fingerprint
@@ -6,8 +6,6 @@ import { requireUser, requireAdmin } from './lib/auth.mjs';
 // documented combination that's a strict subset of what's being asked about
 // now (e.g. a case was logged for "A|B", and this query is for "A|B|C" -
 // still relevant, just not the whole current picture).
-const STORE_NAME = 'assisto';
-const BLOB_KEY = 'known-cases.json';
 
 function fingerprintToSet(fp) {
   return (fp || '')
@@ -28,11 +26,6 @@ function isProperSubset(small, big) {
   return small.every((x) => bigSet.has(x));
 }
 
-async function loadCases(store) {
-  const data = await store.get(BLOB_KEY, { type: 'json' });
-  return Array.isArray(data) ? data : [];
-}
-
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -40,21 +33,61 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-async function handleGetAll(req, store) {
+function toIso(value) {
+  if (!value) return value;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function rowToCase(row, likedBy) {
+  const out = {
+    id: row.id,
+    fingerprint: row.fingerprint,
+    machineType: row.machine_type,
+    timestamp: toIso(row.timestamp),
+    technician: row.technician,
+    messages: Array.isArray(row.messages) ? row.messages : [],
+    cause: row.cause,
+    remedy: row.remedy,
+    likedBy: likedBy || [],
+    verified: !!row.verified,
+  };
+  if (row.verified_by) out.verifiedBy = row.verified_by;
+  if (row.verified_at) out.verifiedAt = toIso(row.verified_at);
+  if (row.edited_at) out.editedAt = toIso(row.edited_at);
+  if (row.edited_by) out.editedBy = row.edited_by;
+  return out;
+}
+
+async function getLikedBy(caseId) {
+  const rows = await sql()`SELECT username FROM case_likes WHERE case_id = ${caseId}`;
+  return rows.map((r) => r.username);
+}
+
+async function attachLikes(rows) {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const likeRows = await sql()`SELECT case_id, username FROM case_likes WHERE case_id = ANY(${ids})`;
+  const byCase = {};
+  for (const lr of likeRows) {
+    (byCase[lr.case_id] = byCase[lr.case_id] || []).push(lr.username);
+  }
+  return rows.map((r) => rowToCase(r, byCase[r.id] || []));
+}
+
+async function handleGetAll(req) {
   const admin = await requireAdmin(req);
   if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
-  const cases = await loadCases(store);
-  return jsonResponse({ cases: cases.slice().reverse() });
+  const rows = await sql()`SELECT * FROM cases ORDER BY timestamp DESC`;
+  return jsonResponse({ cases: await attachLikes(rows) });
 }
 
 // A technician's own submissions, for the "Mein Konto" page - so they can
 // edit or remove a case without needing admin access.
-async function handleGetMine(req, store) {
+async function handleGetMine(req) {
   const user = await requireUser(req);
   if (!user) return jsonResponse({ success: false, message: 'Login required' }, 401);
-  const cases = await loadCases(store);
-  const mine = cases.filter((c) => c.technician === user.username);
-  return jsonResponse({ cases: mine.slice().reverse() });
+  const rows = await sql()`SELECT * FROM cases WHERE technician = ${user.username} ORDER BY timestamp DESC`;
+  return jsonResponse({ cases: await attachLikes(rows) });
 }
 
 // Admins can act on any case; a technician may only act on their own.
@@ -66,24 +99,26 @@ async function requireAdminOrOwner(req, entry) {
   return null;
 }
 
-async function handleGet(store, url) {
+async function handleGet(url) {
   const fp = url.searchParams.get('fp') || '';
   const type = url.searchParams.get('type') || '';
   const querySet = fingerprintToSet(fp);
 
-  const cases = await loadCases(store);
-  const exact = [];
-  const partial = [];
+  const rows = await sql()`SELECT * FROM cases`;
+  const exactRows = [];
+  const partialRows = [];
 
-  for (const c of cases) {
-    const savedSet = fingerprintToSet(c.fingerprint);
+  for (const row of rows) {
+    const savedSet = fingerprintToSet(row.fingerprint);
     if (setsEqual(savedSet, querySet)) {
-      exact.push(c);
+      exactRows.push(row);
     } else if (isProperSubset(savedSet, querySet)) {
-      partial.push(c);
+      partialRows.push(row);
     }
   }
 
+  const exact = await attachLikes(exactRows);
+  const partial = await attachLikes(partialRows);
   const sameType = (c) => !!type && c.machineType === type;
 
   return jsonResponse({
@@ -97,10 +132,13 @@ async function handleGet(store, url) {
 // Distinct machine types seen across all cases - powers the type picker on
 // the search page, so a technician chooses from types that actually have
 // documented cases instead of typing one from memory.
-async function handleTypes(store) {
-  const cases = await loadCases(store);
-  const types = Array.from(new Set(cases.map((c) => c.machineType).filter((t) => t && t !== '---'))).sort();
-  return jsonResponse({ types });
+async function handleTypes() {
+  const rows = await sql()`
+    SELECT DISTINCT machine_type FROM cases
+    WHERE machine_type IS NOT NULL AND machine_type != '---'
+    ORDER BY machine_type
+  `;
+  return jsonResponse({ types: rows.map((r) => r.machine_type) });
 }
 
 // Free-text search, scoped to one machine type - a fingerprint match only
@@ -109,26 +147,24 @@ async function handleTypes(store) {
 // fan on a WT190" without one. Scoped to a type because the same words
 // ("fan", "sensor") show up across unrelated machine types often enough
 // that an unscoped search would mostly return noise.
-async function handleSearch(store, url) {
+async function handleSearch(url) {
   const type = (url.searchParams.get('type') || '').trim();
-  const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+  const q = (url.searchParams.get('q') || '').trim();
 
   if (!type) return jsonResponse({ success: false, message: 'type is required' }, 400);
   if (!q) return jsonResponse({ cases: [] });
 
-  const cases = await loadCases(store);
-  const matches = cases.filter((c) => {
-    if (c.machineType !== type) return false;
-    const haystack = [c.cause, c.remedy, ...(Array.isArray(c.messages) ? c.messages : [])]
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(q);
-  });
-
-  return jsonResponse({ cases: matches.reverse() });
+  const like = `%${q}%`;
+  const rows = await sql()`
+    SELECT * FROM cases
+    WHERE machine_type = ${type}
+      AND (cause ILIKE ${like} OR remedy ILIKE ${like} OR messages::text ILIKE ${like})
+    ORDER BY timestamp DESC
+  `;
+  return jsonResponse({ cases: await attachLikes(rows) });
 }
 
-async function handlePost(store, req) {
+async function handlePost(req) {
   const user = await requireUser(req);
   if (!user) return jsonResponse({ success: false, message: 'Login required to share a fix' }, 401);
 
@@ -142,32 +178,24 @@ async function handlePost(store, req) {
   const fingerprint = (body.fingerprint || '').trim();
   const cause = (body.cause || '').trim();
   const remedy = (body.remedy || '').trim();
-  const machineType = (body.machineType || '').trim();
+  const machineType = (body.machineType || '').trim() || '---';
   const messages = Array.isArray(body.messages) ? body.messages.map((m) => String(m).trim()).filter(Boolean) : [];
 
   if (!fingerprint || !cause || !remedy) {
     return jsonResponse({ success: false, message: 'fingerprint, cause and remedy are required' }, 400);
   }
 
-  const cases = await loadCases(store);
-  const entry = {
-    id: crypto.randomUUID(),
-    fingerprint,
-    machineType: machineType || '---',
-    timestamp: new Date().toISOString(),
-    technician: user.username,
-    messages,
-    cause,
-    remedy,
-  };
+  const id = crypto.randomUUID();
+  const rows = await sql()`
+    INSERT INTO cases (id, fingerprint, machine_type, technician, messages, cause, remedy)
+    VALUES (${id}, ${fingerprint}, ${machineType}, ${user.username}, ${JSON.stringify(messages)}, ${cause}, ${remedy})
+    RETURNING *
+  `;
 
-  cases.push(entry);
-  await store.setJSON(BLOB_KEY, cases);
-
-  return jsonResponse({ success: true, entry });
+  return jsonResponse({ success: true, entry: rowToCase(rows[0], []) });
 }
 
-async function handlePut(store, req) {
+async function handlePut(req) {
   let body;
   try {
     body = await req.json();
@@ -182,66 +210,72 @@ async function handlePut(store, req) {
     return jsonResponse({ success: false, message: 'id, cause and remedy are required' }, 400);
   }
 
-  const cases = await loadCases(store);
-  const entry = cases.find((c) => c.id === id);
+  const existingRows = await sql()`SELECT * FROM cases WHERE id = ${id}`;
+  const entry = existingRows[0];
   if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
 
   const actor = await requireAdminOrOwner(req, entry);
   if (!actor) return jsonResponse({ success: false, message: 'Not authorized to edit this case' }, 403);
 
-  entry.cause = cause;
-  entry.remedy = remedy;
-  entry.editedAt = new Date().toISOString();
-  entry.editedBy = actor.username;
+  const rows = await sql()`
+    UPDATE cases SET cause = ${cause}, remedy = ${remedy}, edited_at = now(), edited_by = ${actor.username}
+    WHERE id = ${id}
+    RETURNING *
+  `;
 
-  await store.setJSON(BLOB_KEY, cases);
-  return jsonResponse({ success: true, entry });
+  return jsonResponse({ success: true, entry: rowToCase(rows[0], await getLikedBy(id)) });
 }
 
 // Any logged-in user can like/unlike a case ("this helped me") - toggles
-// their username in and out of the case's likedBy list.
-async function handleToggleLike(store, req, id) {
+// their username in and out of the case_likes join table. The insert side
+// is a single atomic statement (ON CONFLICT DO NOTHING), so two concurrent
+// likes from different users can never clobber each other the way a
+// read-modify-write over one JSON blob used to.
+async function handleToggleLike(req, id) {
   const user = await requireUser(req);
   if (!user) return jsonResponse({ success: false, message: 'Login required to like a case' }, 401);
 
-  const cases = await loadCases(store);
-  const entry = cases.find((c) => c.id === id);
-  if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
+  const existing = await sql()`SELECT 1 FROM cases WHERE id = ${id}`;
+  if (existing.length === 0) return jsonResponse({ success: false, message: 'Case not found' }, 404);
 
-  if (!Array.isArray(entry.likedBy)) entry.likedBy = [];
-  const idx = entry.likedBy.indexOf(user.username);
-  const liked = idx === -1;
-  if (liked) entry.likedBy.push(user.username);
-  else entry.likedBy.splice(idx, 1);
+  const inserted = await sql()`
+    INSERT INTO case_likes (case_id, username) VALUES (${id}, ${user.username})
+    ON CONFLICT (case_id, username) DO NOTHING
+    RETURNING username
+  `;
 
-  await store.setJSON(BLOB_KEY, cases);
-  return jsonResponse({ success: true, liked, likes: entry.likedBy.length });
+  let liked;
+  if (inserted.length > 0) {
+    liked = true;
+  } else {
+    await sql()`DELETE FROM case_likes WHERE case_id = ${id} AND username = ${user.username}`;
+    liked = false;
+  }
+
+  const countRows = await sql()`SELECT COUNT(*)::int AS count FROM case_likes WHERE case_id = ${id}`;
+  return jsonResponse({ success: true, liked, likes: countRows[0].count });
 }
 
 // Admins mark a case as verified ("checked and confirmed correct") - a
 // stronger trust signal than likes, shown as a badge to everyone.
-async function handleSetVerified(store, req, id, verified) {
+async function handleSetVerified(req, id, verified) {
   const admin = await requireAdmin(req);
   if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
 
-  const cases = await loadCases(store);
-  const entry = cases.find((c) => c.id === id);
-  if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
+  const rows = await sql()`
+    UPDATE cases SET
+      verified = ${verified},
+      verified_by = ${verified ? admin.username : null},
+      verified_at = ${verified ? new Date().toISOString() : null}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  if (rows.length === 0) return jsonResponse({ success: false, message: 'Case not found' }, 404);
 
-  entry.verified = verified;
-  if (verified) {
-    entry.verifiedBy = admin.username;
-    entry.verifiedAt = new Date().toISOString();
-  } else {
-    delete entry.verifiedBy;
-    delete entry.verifiedAt;
-  }
-
-  await store.setJSON(BLOB_KEY, cases);
-  return jsonResponse({ success: true, verified: entry.verified });
+  return jsonResponse({ success: true, verified: rows[0].verified });
 }
 
-async function handlePatch(store, req) {
+async function handlePatch(req) {
   let body;
   try {
     body = await req.json();
@@ -253,9 +287,9 @@ async function handlePatch(store, req) {
   if (!id) return jsonResponse({ success: false, message: 'id is required' }, 400);
 
   if (typeof body.verified === 'boolean') {
-    return handleSetVerified(store, req, id, body.verified);
+    return handleSetVerified(req, id, body.verified);
   }
-  return handleToggleLike(store, req, id);
+  return handleToggleLike(req, id);
 }
 
 // Admin-only export shaped for ControlCenter's local KnownCases.json, so a
@@ -272,28 +306,30 @@ async function handlePatch(store, req) {
 //   the Ids/messages baked into the QR code, not the machine's live log) -
 //   so this is synthesized as "<Id> - <message>" lines, good enough for the
 //   local history view but not a byte-identical original log line.
-async function handleExport(req, store, onlyVerified) {
+async function handleExport(req, onlyVerified) {
   const admin = await requireAdmin(req);
   if (!admin) return jsonResponse({ success: false, message: 'Admin authorization required' }, 401);
 
-  const cases = await loadCases(store);
-  const filtered = onlyVerified ? cases.filter((c) => c.verified) : cases;
+  const rows = onlyVerified
+    ? await sql()`SELECT * FROM cases WHERE verified = true`
+    : await sql()`SELECT * FROM cases`;
 
-  const exported = filtered.map((c) => {
-    const ids = fingerprintToSet(c.fingerprint);
-    const messages = Array.isArray(c.messages) ? c.messages : [];
+  const exported = rows.map((row) => {
+    const ids = fingerprintToSet(row.fingerprint);
+    const messages = Array.isArray(row.messages) ? row.messages : [];
     const packetSnapshot = ids.map((id, i) => (messages[i] ? `${id} - ${messages[i]}` : id));
-    const timestamp = (c.timestamp || '').replace('T', ' ').replace(/\.\d+Z?$/, '').replace(/Z$/, '');
+    const ts = row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp);
+    const timestamp = ts.toISOString().replace('T', ' ').replace(/\.\d+Z?$/, '');
 
     return {
-      id: c.id,
-      fingerprint: c.fingerprint,
-      machineType: c.machineType || '---',
+      id: row.id,
+      fingerprint: row.fingerprint,
+      machineType: row.machine_type || '---',
       machineNumber: '---',
       timestamp,
-      technician: c.technician || '',
-      cause: c.cause,
-      remedy: c.remedy,
+      technician: row.technician || '',
+      cause: row.cause,
+      remedy: row.remedy,
       packetSnapshot,
     };
   });
@@ -307,43 +343,38 @@ async function handleExport(req, store, onlyVerified) {
   });
 }
 
-async function handleDelete(store, req, url) {
+async function handleDelete(req, url) {
   const id = (url.searchParams.get('id') || '').trim();
   if (!id) return jsonResponse({ success: false, message: 'id query param is required' }, 400);
 
-  const cases = await loadCases(store);
-  const entry = cases.find((c) => c.id === id);
+  const rows = await sql()`SELECT * FROM cases WHERE id = ${id}`;
+  const entry = rows[0];
   if (!entry) return jsonResponse({ success: false, message: 'Case not found' }, 404);
 
   const actor = await requireAdminOrOwner(req, entry);
   if (!actor) return jsonResponse({ success: false, message: 'Not authorized to delete this case' }, 403);
 
-  const remaining = cases.filter((c) => c.id !== id);
-  await store.setJSON(BLOB_KEY, remaining);
+  await sql()`DELETE FROM cases WHERE id = ${id}`;
   return jsonResponse({ success: true });
 }
 
 export default async (req) => {
-  // Strong consistency: a technician who just submitted a case immediately
-  // re-fetches the list to see it reflected - the default "eventual"
-  // consistency briefly returned stale (empty) results in testing.
-  const store = getStore({ name: STORE_NAME, consistency: 'strong' });
   const url = new URL(req.url);
 
   if (req.method === 'GET') {
     if (url.searchParams.get('export') === '1') {
-      return handleExport(req, store, url.searchParams.get('onlyVerified') !== '0');
+      return handleExport(req, url.searchParams.get('onlyVerified') !== '0');
     }
-    if (url.searchParams.get('all') === '1') return handleGetAll(req, store);
-    if (url.searchParams.get('mine') === '1') return handleGetMine(req, store);
-    if (url.searchParams.get('types') === '1') return handleTypes(store);
-    if (url.searchParams.get('search') === '1') return handleSearch(store, url);
-    return handleGet(store, url);
+    if (url.searchParams.get('all') === '1') return handleGetAll(req);
+    if (url.searchParams.get('mine') === '1') return handleGetMine(req);
+    if (url.searchParams.get('types') === '1') return handleTypes();
+    if (url.searchParams.get('search') === '1') return handleSearch(url);
+    return handleGet(url);
   }
-  if (req.method === 'POST') return handlePost(store, req);
-  if (req.method === 'PUT') return handlePut(store, req);
-  if (req.method === 'PATCH') return handlePatch(store, req);
-  if (req.method === 'DELETE') return handleDelete(store, req, url);
+  if (req.method === 'POST') return handlePost(req);
+  if (req.method === 'PUT') return handlePut(req);
+  if (req.method === 'PATCH') return handlePatch(req);
+  if (req.method === 'DELETE') return handleDelete(req, url);
 
   return new Response('Method Not Allowed', { status: 405 });
 };

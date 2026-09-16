@@ -1,5 +1,5 @@
 import { hashPassword, requireAdmin, requireUser } from './lib/auth.mjs';
-import { loadUsers, saveUsers, publicUser } from './lib/users-store.mjs';
+import { getUserByUsername, listUsers, createUser, updateUserPassword, deleteUser, publicUser } from './lib/users-store.mjs';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -14,7 +14,7 @@ function validatePassword(password) {
 }
 
 async function handleGet() {
-  const users = await loadUsers();
+  const users = await listUsers();
   return jsonResponse({ users: users.map(publicUser) });
 }
 
@@ -39,22 +39,12 @@ async function handlePost(req, admin) {
     return jsonResponse({ success: false, message: 'username may only contain lowercase letters, digits, dots, dashes and underscores' }, 400);
   }
 
-  const users = await loadUsers();
-  if (users.some((u) => u.username === username)) {
+  if (await getUserByUsername(username)) {
     return jsonResponse({ success: false, message: 'That username already exists' }, 409);
   }
 
   const { salt, hash } = await hashPassword(password);
-  const user = {
-    username,
-    salt,
-    hash,
-    role,
-    createdAt: new Date().toISOString(),
-    createdBy: admin.username,
-  };
-  users.push(user);
-  await saveUsers(users);
+  const user = await createUser({ username, salt, hash, role, createdBy: admin.username });
 
   return jsonResponse({ success: true, user: publicUser(user) });
 }
@@ -83,15 +73,11 @@ async function handlePatch(req, admin) {
   const passwordError = validatePassword(password);
   if (passwordError) return jsonResponse({ success: false, message: passwordError }, 400);
 
-  const users = await loadUsers();
-  const user = users.find((u) => u.username === username);
-  if (!user) return jsonResponse({ success: false, message: 'User not found' }, 404);
-
   const { salt, hash } = await hashPassword(password);
-  user.salt = salt;
-  user.hash = hash;
+  const updated = await updateUserPassword(username, { salt, hash });
+  if (!updated) return jsonResponse({ success: false, message: 'User not found' }, 404);
 
-  await saveUsers(users);
+  const user = await getUserByUsername(username);
   return jsonResponse({ success: true, user: publicUser(user) });
 }
 
@@ -103,13 +89,9 @@ async function handleDelete(req, admin) {
     return jsonResponse({ success: false, message: 'You cannot delete the account you are logged in as' }, 400);
   }
 
-  const users = await loadUsers();
-  const remaining = users.filter((u) => u.username !== username);
-  if (remaining.length === users.length) {
-    return jsonResponse({ success: false, message: 'User not found' }, 404);
-  }
+  const deleted = await deleteUser(username);
+  if (!deleted) return jsonResponse({ success: false, message: 'User not found' }, 404);
 
-  await saveUsers(remaining);
   return jsonResponse({ success: true });
 }
 

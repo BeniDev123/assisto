@@ -316,11 +316,17 @@
     document.getElementById('master-btn').addEventListener('click', function() {
         var value = document.getElementById('master-secret').value.trim();
         var msg = document.getElementById('access-message');
+        var btn = document.getElementById('master-btn');
         if (!value) {
             msg.textContent = 'Bitte Master-Schlüssel eingeben.';
             return;
         }
         AssistoAuth.setMasterSecret(value);
+
+        btn.disabled = true;
+        var originalLabel = btn.textContent;
+        btn.textContent = 'Prüfe...';
+        msg.textContent = '';
 
         fetch('/api/users', { headers: AssistoAuth.adminHeaders() })
             .then(function(resp) {
@@ -331,6 +337,10 @@
             .catch(function(err) {
                 AssistoAuth.clearMasterSecret();
                 msg.textContent = err.message;
+            })
+            .finally(function() {
+                btn.disabled = false;
+                btn.textContent = originalLabel;
             });
     });
 
